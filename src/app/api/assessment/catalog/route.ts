@@ -1,8 +1,5 @@
 import { and, asc, desc, eq, ilike, like, or } from "drizzle-orm";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");

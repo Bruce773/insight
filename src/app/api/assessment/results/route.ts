@@ -1,8 +1,5 @@
 import { desc, eq } from "drizzle-orm";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 async function dependencies() {
   if (!process.env.DATABASE_URL) return null;
   const [{ auth }, { db }, { assessmentResults }] = await Promise.all([

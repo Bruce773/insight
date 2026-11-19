@@ -4,9 +4,6 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 export async function DELETE(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {

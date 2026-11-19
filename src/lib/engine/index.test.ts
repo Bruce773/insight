@@ -10,6 +10,7 @@ import {
   scoreRiasec,
 } from "./index";
 import placeholder from "../../../data/mappings/facet-to-workstyle.json";
+import { scoreAssessment, type AssessmentForm } from "./assessment";
 
 describe("assessment scoring", () => {
   it("normalizes, reverses and aggregates answered personality items with optional norms", () => {
@@ -53,6 +54,26 @@ describe("assessment scoring", () => {
     expect(result.investigative?.score).toBe(1);
     expect(result.social).toBeUndefined();
     expect(() => scoreRiasec([{ id: "x", dimension: "unknown" as never }], {})).toThrow();
+  });
+
+  it("scores a completed assessment without inventing facets for domain-only items", () => {
+    const form: AssessmentForm = {
+      mode: "quick",
+      instrument: "Synthetic test form",
+      items: [
+        { id: "a", text: "Test item A", domain: "test", facet: null, reverseKeyed: false },
+        { id: "b", text: "Test item B", domain: "test", facet: null, reverseKeyed: true },
+      ],
+    };
+    const result = scoreAssessment(form, { a: 5, b: 2 });
+    expect(result.domains.test).toMatchObject({ rawScore: 9, count: 2 });
+    expect(result.facets).toEqual({});
+    expect(result.responses).toEqual({ a: 5, b: 2 });
+    expect(() => scoreAssessment(form, { a: 5 })).toThrow();
+    expect(() => scoreAssessment(form, { a: 5, b: 2, extra: 3 })).toThrow();
+    expect(() => scoreAssessment(form, { a: 5, b: 2.5 })).toThrow();
+    expect(() => scoreAssessment(form, { a: 5, b: 0 })).toThrow();
+    expect(() => scoreAssessment({ ...form, items: [form.items[0], form.items[0]] }, { a: 5 })).toThrow();
   });
 });
 

@@ -8,7 +8,7 @@ export type Responses = Record<string, number | undefined>;
 
 export interface PersonalityItem {
   id: string;
-  facet: string;
+  facet?: string | null;
   domain: string;
   reverseKeyed?: boolean;
   min?: number;
@@ -133,10 +133,10 @@ export function scorePersonality(
   const seen = new Set<string>();
   for (const item of items) {
     checkId(item.id, seen);
-    if (!item.facet || !item.domain) throw new Error(`Missing facet or domain for ${item.id}`);
+    if (!item.domain) throw new Error(`Missing domain for ${item.id}`);
     const score = normalizedResponse(item, responses);
     if (score !== undefined) {
-      add(facets, item.facet, score);
+      if (item.facet) add(facets, item.facet, score);
       add(domains, item.domain, score);
     }
   }

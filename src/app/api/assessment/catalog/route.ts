@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, ilike, like, or } from "drizzle-orm";
+import { assessmentInstrument, createAssessmentForm } from "@/lib/assessment/forms";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");
-  if (!["status", "occupations", "skills"].includes(type ?? "")) {
+  if (!["status", "assessment", "occupations", "skills"].includes(type ?? "")) {
     return Response.json({ error: "Unknown catalog request" }, { status: 400 });
   }
   if (!process.env.DATABASE_URL) {
@@ -23,6 +24,25 @@ export async function GET(request: Request) {
         source: assessmentItems.source,
       }).from(assessmentItems).limit(10000);
       return Response.json({ itemCount: items.length, instruments: [...new Set(items.map((item) => item.instrument))] });
+    }
+
+    if (type === "assessment") {
+      const mode = url.searchParams.get("form");
+      if (mode !== "quick" && mode !== "full") {
+        return Response.json({ error: "Unknown assessment form." }, { status: 400 });
+      }
+      const items = await db.select({
+        id: assessmentItems.id,
+        text: assessmentItems.text,
+        domain: assessmentItems.domain,
+        facet: assessmentItems.facet,
+        reverseKeyed: assessmentItems.reverseKeyed,
+      }).from(assessmentItems).where(eq(assessmentItems.instrument, assessmentInstrument(mode)));
+      const form = createAssessmentForm(mode, items);
+      if (!form) {
+        return Response.json({ error: "The verified questions for this assessment are unavailable or incomplete." }, { status: 503 });
+      }
+      return Response.json(form, { headers: { "Cache-Control": "no-store" } });
     }
 
     if (type === "occupations") {

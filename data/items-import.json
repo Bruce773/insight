@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "file": "items/mini-ipip.csv",
+      "columns": {
+        "instrument": { "value": "Mini-IPIP" },
+        "source": { "value": "IPIP Mini-IPIP scoring key, Donnellan et al. (2006): https://ipip.ori.org/MiniIPIPKey.htm" }
+      }
+    },
+    {
+      "file": "items/ipip-neo-120.csv",
+      "columns": {
+        "instrument": { "value": "IPIP-NEO-120" },
+        "source": { "value": "IPIP 30 facet scales, Johnson (2014): https://ipip.ori.org/30FacetNEO-PI-RItems.htm" }
+      }
+    }
+  ]
+}

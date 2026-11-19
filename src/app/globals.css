@@ -38,6 +38,12 @@ p { margin: 0 0 16px; }
 .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .choice { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 24px; min-height: 210px; text-align: left; display: flex; align-items: flex-start; flex-direction: column; gap: 12px; color: var(--muted); }
 .choice:hover, .choice.selected { border-color: #7aa273; }
+.primary:disabled, .choice:disabled { opacity: .55; cursor: not-allowed; }
+.assessment-question { border: 0; padding: 0; margin: 28px 0; }
+.assessment-question legend { font-family: Georgia, serif; font-size: 26px; margin-bottom: 12px; }
+.assessment-option { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); background: white; border-radius: 6px; padding: 12px 16px; margin: 8px 0; font-weight: 400; cursor: pointer; }
+.assessment-option:has(input:checked) { border-color: #7aa273; background: #edf5e6; }
+.assessment-option input { width: auto; margin: 0; }
 .choice strong { font-family: Georgia, serif; font-size: 23px; color: var(--ink); font-weight: 400; }
 .tag { background: #edf5db; color: #57754b; border-radius: 4px; padding: 4px 8px; font-size: 10px; letter-spacing: .1em; font-weight: 800; }
 .arrow { color: var(--ink); font-size: 13px; font-weight: 700; margin-top: auto; }

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { AssessmentFlow, AssessmentScores, isAssessmentResult } from "@/components/assessment-flow";
+import type { AssessmentResult } from "@/lib/engine/assessment";
 
 type Occupation = { code: string; title: string; description: string | null; jobZone: number | null };
 type Skill = { elementId: string; elementName: string; value: number; source: string };
@@ -14,6 +16,7 @@ type Plan = {
   occupation: Occupation | null;
   ratings: Record<string, number>;
   action: string;
+  assessment?: AssessmentResult;
 };
 type Saved = { id: string; createdAt: string; payload: unknown };
 type Step = "welcome" | "assessment" | "aspirations" | "skills" | "results";
@@ -39,7 +42,8 @@ function isPlan(value: unknown): value is Plan {
   const p = value as Plan;
   return p.version === 1 && typeof p.aspiration === "string" && typeof p.horizon === "string"
     && typeof p.action === "string" && !!p.ratings && typeof p.ratings === "object"
-    && (p.occupation === null || (typeof p.occupation === "object" && typeof p.occupation.code === "string" && typeof p.occupation.title === "string"));
+    && (p.occupation === null || (typeof p.occupation === "object" && typeof p.occupation.code === "string" && typeof p.occupation.title === "string"))
+    && (p.assessment === undefined || isAssessmentResult(p.assessment));
 }
 
 export function InsightApp() {
@@ -49,8 +53,7 @@ export function InsightApp() {
   const [occupations, setOccupations] = useState<Occupation[]>([]);
   const [skillState, setSkillState] = useState<{ code: string; items: Skill[]; message: string } | null>(null);
   const [catalogMessage, setCatalogMessage] = useState("");
-  const [assessmentMessage, setAssessmentMessage] = useState("");
-  const [mode, setMode] = useState<"quick" | "full" | null>(null);
+  const [assessmentSession, setAssessmentSession] = useState(0);
   const [session, setSession] = useState<"checking" | "signed-in" | "guest">("checking");
   const [saved, setSaved] = useState<Saved[]>([]);
   const [saveMessage, setSaveMessage] = useState("");
@@ -102,19 +105,6 @@ export function InsightApp() {
     return () => controller.abort();
   }, [plan.occupation]);
 
-  async function chooseAssessment(selected: "quick" | "full") {
-    setMode(selected);
-    setAssessmentMessage("Checking the imported assessment catalog…");
-    try {
-      const data = await getJson("/api/assessment/catalog?type=status");
-      setAssessmentMessage(data.itemCount
-        ? "Imported questions exist, but their response scales and verified quick/full form definitions are not available. This assessment is blocked to avoid presenting an unvalidated questionnaire."
-        : "No assessment questions have been imported. This assessment is unavailable until verified questions, response scales, and form definitions are provided.");
-    } catch {
-      setAssessmentMessage("The assessment catalog is unavailable. This assessment cannot start until verified questions, response scales, and form definitions are available.");
-    }
-  }
-
   async function savePlan() {
     setSaveMessage("Saving…");
     try {
@@ -133,6 +123,7 @@ export function InsightApp() {
   function loadPlan(payload: unknown) {
     if (!isPlan(payload)) { setSaveMessage("This saved entry is not a plan that this version can open."); return; }
     setPlan(payload);
+    setAssessmentSession((session) => session + 1);
     setSaveMessage("Saved plan loaded.");
     setStep("results");
   }
@@ -141,7 +132,8 @@ export function InsightApp() {
     <div className="shell">
       <header className="topbar">
         <Link className="brand" href="/" aria-label="InSight home"><span className="brand-mark">✳</span> InSight</Link>
-        <nav className="account" aria-label="Account">
+        <nav className="account" aria-label="Account and information">
+          <Link href="/about" target="_blank" rel="noopener noreferrer" aria-label="About InSight (opens in a new tab)">About</Link>
           {session === "signed-in" ? <><a href="/api/data/export">Export data</a><button type="button" onClick={() => signOut({ redirectTo: "/" })}>Sign out</button></> : <Link prefetch={false} href="/api/auth/signin">Sign in</Link>}
         </nav>
       </header>
@@ -155,20 +147,15 @@ export function InsightApp() {
           <h1>Make space for<br /><em>what&apos;s next.</em></h1>
           <p className="lead">Explore what matters to you, reflect on your skills, and make a plan for your next chapter.</p>
           <div className="actions"><button className="primary" onClick={() => setStep("assessment")}>Get started <span aria-hidden>→</span></button><button className="text-button" onClick={() => setStep("aspirations")}>Skip to my plan →</button></div>
-          <aside className="notice"><strong>A note before you begin</strong><p>InSight is for personal career exploration. Not for hiring or employment decisions.</p><p>InSight is a reflection tool, not career, financial, or mental health advice. Your choices and circumstances matter more than any score. Assessments require verified source material and may not yet be available.</p><p>Guest progress stays in this page only and is lost on reload. Sign in to save a plan to your account.</p></aside>
+          <p className="hint">Guest progress stays in this page only and is lost on reload. Sign in to save a plan to your account.</p>
         </section>}
 
-        {step === "assessment" && <section className="content">
-          <div className="eyebrow">01 / GET TO KNOW YOURSELF</div>
-          <h1>Start with reflection.</h1>
-          <p className="lead">Choose an assessment when verified questions and scoring information are available. You can also continue without one.</p>
-          <div className="cards">
-            <button className={`choice ${mode === "quick" ? "selected" : ""}`} onClick={() => chooseAssessment("quick")}><span className="tag">QUICK</span><strong>Quick assessment</strong><span>A shorter reflection, when a verified short form is available.</span><span className="arrow">Check availability →</span></button>
-            <button className={`choice ${mode === "full" ? "selected" : ""}`} onClick={() => chooseAssessment("full")}><span className="tag">FULL</span><strong>Full assessment</strong><span>A more detailed reflection, when a verified full form is available.</span><span className="arrow">Check availability →</span></button>
-          </div>
-          {assessmentMessage && <div className="notice" role="status"><strong>{mode === "quick" ? "Quick" : "Full"} assessment unavailable</strong><p>{assessmentMessage}</p></div>}
-          <div className="actions"><button className="primary" onClick={() => setStep("aspirations")}>Continue without assessment →</button><button className="text-button" onClick={() => setStep("welcome")}>Back</button></div>
-        </section>}
+        <section className="content" hidden={step !== "assessment"}>
+          <AssessmentFlow key={assessmentSession} result={plan.assessment}
+            onComplete={(assessment) => setPlan((current) => ({ ...current, assessment }))}
+            onSkip={() => { setPlan((current) => ({ ...current, assessment: undefined })); setStep("aspirations"); }}
+            onContinue={() => setStep("aspirations")} onBack={() => setStep("welcome")} />
+        </section>
 
         {step === "aspirations" && <section className="content">
           <div className="eyebrow">02 / LOOK AHEAD</div>
@@ -200,7 +187,8 @@ export function InsightApp() {
         {step === "results" && <section className="content">
           <div className="eyebrow">04 / YOUR NEXT CHAPTER</div>
           <h1>A plan that starts with you.</h1>
-          <p className="lead">A summary of what you entered. This is not a scored assessment or an occupation match.</p>
+          <p className="lead">{plan.assessment ? "Your assessment results and a summary of what you entered." : "A summary of what you entered. This is not a scored assessment or an occupation match."}</p>
+          {plan.assessment && <AssessmentScores result={plan.assessment} />}
           <div className="summary"><div><span>YOUR ASPIRATION</span><p>{plan.aspiration || "You haven’t added an aspiration yet."}</p></div><div><span>TIME HORIZON</span><p>{plan.horizon || "Not specified"}</p></div><div><span>OCCUPATION YOU CHOSE</span><p>{plan.occupation?.title || "None selected"}</p></div></div>
           <h2>Your skill reflections</h2>
           {skills.filter((skill) => plan.ratings[skill.elementId]).length ? <ul className="reflection-list">{skills.filter((skill) => plan.ratings[skill.elementId]).map((skill) => <li key={skill.elementId}>{skill.elementName} <strong>{plan.ratings[skill.elementId]} / 5 confidence</strong></li>)}</ul> : <p>No skill ratings to show. You can add them on the skills step.</p>}
@@ -209,10 +197,10 @@ export function InsightApp() {
           <div className="actions">{session === "signed-in" ? <button className="primary" onClick={savePlan}>Save my plan</button> : <Link prefetch={false} className="primary" href="/api/auth/signin">Sign in to save</Link>}<button className="text-button" onClick={() => setStep("skills")}>Back to skills</button></div>
           {session !== "signed-in" && <p className="hint">Guest entries remain in this page only and will be lost if you leave or sign in.</p>}
           {saveMessage && <p role="status">{saveMessage}</p>}
-          {session === "signed-in" && <><div className="divider" /><h2>Saved plans</h2>{saved.length ? <ul className="saved-list">{saved.map((entry) => <li key={entry.id}><span>{new Date(entry.createdAt).toLocaleString()}</span><button className="text-button" onClick={() => loadPlan(entry.payload)}>Open plan →</button></li>)}</ul> : <p>No saved plans to show.</p>}<p className="hint">You can <a href="/api/data/export">export your data</a> or delete your account and its data below.</p><DeleteAccount onDeleted={() => { setSession("guest"); setSaved([]); setPlan(blankPlan); setStep("welcome"); }} /></>}
+          {session === "signed-in" && <><div className="divider" /><h2>Saved plans</h2>{saved.length ? <ul className="saved-list">{saved.map((entry) => <li key={entry.id}><span>{new Date(entry.createdAt).toLocaleString()}</span><button className="text-button" onClick={() => loadPlan(entry.payload)}>Open plan →</button></li>)}</ul> : <p>No saved plans to show.</p>}<p className="hint">You can <a href="/api/data/export">export your data</a> or delete your account and its data below.</p><DeleteAccount onDeleted={() => { setSession("guest"); setSaved([]); setPlan(blankPlan); setAssessmentSession((session) => session + 1); setStep("welcome"); }} /></>}
         </section>}
       </main>
-      <footer><span>✳ InSight</span><span>Terms: Not for hiring or employment decisions.</span></footer>
+      <footer><span>✳ InSight</span><Link href="/about" target="_blank" rel="noopener noreferrer" aria-label="About InSight (opens in a new tab)">About</Link></footer>
     </div>
   );
 }

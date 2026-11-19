@@ -224,7 +224,6 @@ export interface MatchWeights {
   riasec: number;
   workStyles: number;
   aspirations: number;
-  jobZone: number;
 }
 export interface OccupationMatch<T extends Occupation = Occupation> {
   occupation: T;
@@ -268,7 +267,8 @@ export function aspirationFit(title: string, aspirations: readonly Aspiration[])
 
 /**
  * Weighted mean of available components only; missing/constant vectors are
- * excluded. Aspirations and job zones are soft preferences, not filters.
+ * excluded. Job Zones filter occupations outside the selected horizon, except
+ * for occupations explicitly named in the user's aspirations.
  * The default equal weights are configurable and are not empirically calibrated.
  */
 export function rankOccupations<T extends Occupation>(
@@ -276,7 +276,7 @@ export function rankOccupations<T extends Occupation>(
   occupations: readonly T[],
   weights: Partial<MatchWeights> = {},
 ): OccupationMatch<T>[] {
-  const resolved: MatchWeights = { riasec: 1, workStyles: 1, aspirations: 1, jobZone: 1, ...weights };
+  const resolved: MatchWeights = { riasec: 1, workStyles: 1, aspirations: 1, ...weights };
   for (const [name, weight] of Object.entries(resolved)) {
     if (!Number.isFinite(weight) || weight < 0) throw new RangeError(`Invalid weight: ${name}`);
   }
@@ -287,13 +287,17 @@ export function rankOccupations<T extends Occupation>(
     }
   }
   if (profile.jobZones?.some((zone) => !validZone(zone))) throw new RangeError("Job zones must be integers from 1 to 5");
-  return occupations.map((occupation): OccupationMatch<T> => {
+  return occupations.filter((occupation) => {
     if (occupation.jobZone != null && !validZone(occupation.jobZone)) throw new RangeError(`Invalid job zone for ${occupation.code}`);
+    const aspiration = aspirationFit(occupation.title, aspirations);
+    const explicitlyNamed = aspiration !== null && aspiration > 0;
+    return !profile.jobZones?.length || occupation.jobZone == null ||
+      profile.jobZones.includes(occupation.jobZone) || explicitlyNamed;
+  }).map((occupation): OccupationMatch<T> => {
     const components: OccupationMatch["components"] = {
       riasec: interestFit(profile.riasec, occupation.riasec),
       workStyles: interestFit(profile.workStyles, occupation.workStyles),
       aspirations: aspirationFit(occupation.title, aspirations),
-      jobZone: profile.jobZones?.length && occupation.jobZone != null ? (profile.jobZones.includes(occupation.jobZone) ? 1 : 0) : null,
     };
     let sum = 0, total = 0;
     for (const key of Object.keys(resolved) as (keyof MatchWeights)[]) {
@@ -317,40 +321,54 @@ export interface SkillDemand {
   name: string;
   /** Normalized importance for an occupation. */
   importance: number;
+  /** External demand multiplier for the skill and occupation. Defaults to 1. */
+  demand?: number;
+  /** Required skill level on the 0–1 scale. Defaults to 1. */
+  requiredLevel?: number;
   /** Optional occupation relevance, e.g. its match score. Defaults to 1. */
   weight?: number;
 }
 export interface SkillPriority {
   skillId: string;
   name: string;
+  /** Sum of demand-weighted importance across occupations. */
   importance: number;
   rating: number | null;
-  /** Importance × gap; null if the user has not rated the skill. */
+  /** Sum of per-occupation importance × demand × skill-level gap; null if unrated. */
   priority: number | null;
 }
 
-/** Merges repeated skill demands using a weighted mean; unknown ratings remain unknown. */
+/** Sums repeated skill contributions; unknown ratings remain unknown. */
 export function mergeSkillPriorities(
   demands: readonly SkillDemand[],
   selfRatings: Responses,
 ): SkillPriority[] {
-  const groups = new Map<string, { name: string; sum: number; weight: number }>();
+  const groups = new Map<string, { name: string; importance: number; priority: number; weight: number }>();
   for (const demand of demands) {
     if (!demand.skillId || !demand.name) throw new Error("Skills require an id and name");
     assertUnit(demand.importance, `importance for ${demand.skillId}`);
+    const demandWeight = demand.demand ?? 1;
+    if (!Number.isFinite(demandWeight) || demandWeight < 0) throw new RangeError(`Invalid demand for ${demand.skillId}`);
+    const requiredLevel = demand.requiredLevel ?? 1;
+    assertUnit(requiredLevel, `required level for ${demand.skillId}`);
     const weight = demand.weight ?? 1;
     if (!Number.isFinite(weight) || weight < 0) throw new RangeError(`Invalid weight for ${demand.skillId}`);
-    const current = groups.get(demand.skillId) ?? { name: demand.name, sum: 0, weight: 0 };
+    const current = groups.get(demand.skillId) ?? { name: demand.name, importance: 0, priority: 0, weight: 0 };
     if (current.name !== demand.name) throw new Error(`Conflicting names for skill ${demand.skillId}`);
-    current.sum += demand.importance * weight;
+    const contribution = demand.importance * demandWeight * weight;
+    current.importance += contribution;
+    const rating = Object.prototype.hasOwnProperty.call(selfRatings, demand.skillId) ? selfRatings[demand.skillId] ?? null : null;
+    if (rating !== null) {
+      assertUnit(rating, `rating for ${demand.skillId}`);
+      current.priority += contribution * Math.max(0, requiredLevel - rating);
+    }
     current.weight += weight;
     groups.set(demand.skillId, current);
   }
   return [...groups.entries()].filter(([, group]) => group.weight > 0).map(([skillId, group]) => {
-    const importance = group.sum / group.weight;
     const rating = Object.prototype.hasOwnProperty.call(selfRatings, skillId) ? selfRatings[skillId] ?? null : null;
     if (rating !== null) assertUnit(rating, `rating for ${skillId}`);
-    return { skillId, name: group.name, importance, rating, priority: rating === null ? null : importance * (1 - rating) };
+    return { skillId, name: group.name, importance: group.importance, rating, priority: rating === null ? null : group.priority };
   }).sort((a, b) => {
     if (a.priority === null && b.priority !== null) return 1;
     if (a.priority !== null && b.priority === null) return -1;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 type Occupation = { code: string; title: string; description: string | null; jobZone: number | null };
 type Skill = { elementId: string; elementName: string; value: number; source: string };
@@ -141,7 +142,7 @@ export function InsightApp() {
       <header className="topbar">
         <Link className="brand" href="/" aria-label="InSight home"><span className="brand-mark">✳</span> InSight</Link>
         <nav className="account" aria-label="Account">
-          {session === "signed-in" ? <><a href="/api/data/export">Export data</a><Link prefetch={false} href="/api/auth/signout">Sign out</Link></> : <Link prefetch={false} href="/api/auth/signin">Sign in</Link>}
+          {session === "signed-in" ? <><a href="/api/data/export">Export data</a><button type="button" onClick={() => signOut({ redirectTo: "/" })}>Sign out</button></> : <Link prefetch={false} href="/api/auth/signin">Sign in</Link>}
         </nav>
       </header>
       <main>

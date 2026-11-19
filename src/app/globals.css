@@ -11,6 +11,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand { text-decoration: none; font-size: 24px; font-weight: 700; letter-spacing: -.06em; }
 .brand-mark { color: #699864; margin-right: 5px; font-size: 27px; }
 .account { display: flex; gap: 24px; font-size: 14px; font-weight: 600; }
+.account button { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; }
 main { flex: 1; width: min(1120px, 88%); margin: 0 auto; }
 .progress { display: flex; align-items: center; gap: 8px; padding: 32px 0; overflow-x: auto; }
 .progress-item { display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; border: 0; background: transparent; color: #73827a; padding: 4px 14px 4px 0; font-size: 12px; font-weight: 700; }

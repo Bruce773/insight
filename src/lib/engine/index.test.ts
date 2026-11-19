@@ -79,7 +79,7 @@ describe("similarity and work styles", () => {
 });
 
 describe("occupation ranking", () => {
-  it("combines comparable correlations, ranked explicit titles and job zones with specified weights", () => {
+  it("filters occupations outside the Job Zone horizon except explicit aspirations", () => {
     const result = rankOccupations({
       riasec: { realistic: 1, social: 0 },
       aspirations: [{ title: "  Software   Developer ", rank: 2 }],
@@ -87,11 +87,11 @@ describe("occupation ranking", () => {
     }, [
       { code: "a", title: "Software Developer", jobZone: 4, riasec: { realistic: 1, social: 0 } },
       { code: "b", title: "Counselor", jobZone: 3, riasec: { realistic: 0, social: 1 } },
-    ], { riasec: 2, aspirations: 2, jobZone: 1, workStyles: 0 });
-    expect(result.map((match) => match.occupation.code)).toEqual(["a", "b"]);
-    expect(result[0].components).toEqual({ riasec: 1, workStyles: null, aspirations: 0.5, jobZone: 1 });
-    expect(result[0].score).toBeCloseTo(0.8);
-    expect(result[1].score).toBe(0);
+      { code: "c", title: "Software Developer", jobZone: 3 },
+    ], { riasec: 2, aspirations: 2, workStyles: 0 });
+    expect(result.map((match) => match.occupation.code)).toEqual(["a", "c"]);
+    expect(result[0].components).toEqual({ riasec: 1, workStyles: null, aspirations: 0.5 });
+    expect(result[0].score).toBeCloseTo(0.75);
   });
 
   it("renormalizes weights around missing components and never fabricates a score", () => {
@@ -100,7 +100,7 @@ describe("occupation ranking", () => {
       { code: "b", title: "B", riasec: { a: 1, b: 1 } },
       { code: "c", title: "C", jobZone: 2 },
     ]);
-    expect(result.map((r) => r.score)).toEqual([1, 1, null]);
+    expect(result.map((r) => r.score)).toEqual([1, null, null]);
     expect(result[2].components.riasec).toBeNull();
     expect(rankOccupations({}, [{ code: "d", title: "D" }])[0].score).toBeNull();
     expect(() => rankOccupations({ jobZones: [0] }, [])).toThrow();
@@ -126,10 +126,14 @@ describe("skill priorities", () => {
       { skillId: "c", name: "Ignored", importance: 1, weight: 0 },
     ], { a: 0.2 });
     expect(result).toHaveLength(2);
-    expect(result[0].importance).toBe(0.875);
-    expect(result[0].priority).toBeCloseTo(0.7);
+    expect(result[0].importance).toBe(3.5);
+    expect(result[0].priority).toBeCloseTo(2.8);
     expect(result[1].rating).toBeNull();
     expect(result[1].priority).toBeNull();
+    expect(mergeSkillPriorities([
+      { skillId: "a", name: "Analysis", importance: 0.8, demand: 2, requiredLevel: 0.75 },
+      { skillId: "a", name: "Analysis", importance: 0.5, requiredLevel: 0.5 },
+    ], { a: 0.5 })[0]).toMatchObject({ importance: 2.1, priority: 0.4 });
     expect(() => mergeSkillPriorities([{ skillId: "a", name: "A", importance: 2 }], {})).toThrow();
   });
 });

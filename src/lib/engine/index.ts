@@ -292,7 +292,7 @@ export function rankOccupations<T extends Occupation>(
     const aspiration = aspirationFit(occupation.title, aspirations);
     const explicitlyNamed = aspiration !== null && aspiration > 0;
     return !profile.jobZones?.length || occupation.jobZone == null ||
-      profile.jobZones.includes(occupation.jobZone) || explicitlyNamed;
+      profile.jobZones.some((zone) => occupation.jobZone <= zone) || explicitlyNamed;
   }).map((occupation): OccupationMatch<T> => {
     const components: OccupationMatch["components"] = {
       riasec: interestFit(profile.riasec, occupation.riasec),

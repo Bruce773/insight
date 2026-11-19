@@ -1,0 +1,10 @@
+{
+  "_description": "Illustrative placeholder only; not an empirically validated or O*NET-endorsed crosswalk. Supply a validated mapping before consequential use.",
+  "_todo": "Calibrate and validate this crosswalk against appropriate evidence.",
+  "mapping": {
+    "Dependability": { "self_discipline": 1, "dutifulness": 1 },
+    "Cooperation": { "cooperation": 1, "sympathy": 1 },
+    "Innovation": { "imagination": 1, "intellect": 1 },
+    "Stress Tolerance": { "anxiety": -1 }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "occupations": {
+    "file": "onet/Occupation Data.txt"
+  },
+  "jobZones": {
+    "file": "onet/Job Zones.txt"
+  },
+  "workStyles": [
+    {
+      "file": "onet/Work Styles.txt",
+      "columns": {
+        "source": { "value": "O*NET 31.0 Work Styles" }
+      },
+      "scales": { "WI": { "min": -3, "max": 3 } }
+    }
+  ],
+  "interests": [
+    {
+      "file": "onet/Career Interest Types.txt",
+      "columns": { "source": { "value": "O*NET 31.0 Career Interest Types" } }
+    }
+  ],
+  "requirements": [
+    {
+      "file": "onet/Essential Skills.txt",
+      "columns": { "source": { "value": "O*NET 31.0 Essential Skills" } }
+    },
+    {
+      "file": "onet/Transferable Skills.txt",
+      "columns": { "source": { "value": "O*NET 31.0 Transferable Skills" } }
+    },
+    {
+      "file": "onet/Knowledge.txt",
+      "columns": { "source": { "value": "O*NET 31.0 Knowledge" } }
+    }
+  ]
+}

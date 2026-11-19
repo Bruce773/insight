@@ -154,7 +154,7 @@ export function InsightApp() {
           <h1>Make space for<br /><em>what&apos;s next.</em></h1>
           <p className="lead">Explore what matters to you, reflect on your skills, and make a plan for your next chapter.</p>
           <div className="actions"><button className="primary" onClick={() => setStep("assessment")}>Get started <span aria-hidden>→</span></button><button className="text-button" onClick={() => setStep("aspirations")}>Skip to my plan →</button></div>
-          <aside className="notice"><strong>A note before you begin</strong><p>InSight is a reflection tool, not career, financial, or mental health advice. Your choices and circumstances matter more than any score. Assessments require verified source material and may not yet be available.</p><p>Guest progress stays in this page only and is lost on reload. Sign in to save a plan to your account.</p></aside>
+          <aside className="notice"><strong>A note before you begin</strong><p>InSight is for personal career exploration. Not for hiring or employment decisions.</p><p>InSight is a reflection tool, not career, financial, or mental health advice. Your choices and circumstances matter more than any score. Assessments require verified source material and may not yet be available.</p><p>Guest progress stays in this page only and is lost on reload. Sign in to save a plan to your account.</p></aside>
         </section>}
 
         {step === "assessment" && <section className="content">
@@ -211,7 +211,7 @@ export function InsightApp() {
           {session === "signed-in" && <><div className="divider" /><h2>Saved plans</h2>{saved.length ? <ul className="saved-list">{saved.map((entry) => <li key={entry.id}><span>{new Date(entry.createdAt).toLocaleString()}</span><button className="text-button" onClick={() => loadPlan(entry.payload)}>Open plan →</button></li>)}</ul> : <p>No saved plans to show.</p>}<p className="hint">You can <a href="/api/data/export">export your data</a> or delete your account and its data below.</p><DeleteAccount onDeleted={() => { setSession("guest"); setSaved([]); setPlan(blankPlan); setStep("welcome"); }} /></>}
         </section>}
       </main>
-      <footer><span>✳ InSight</span><span>Reflection, not prediction.</span></footer>
+      <footer><span>✳ InSight</span><span>Terms: Not for hiring or employment decisions.</span></footer>
     </div>
   );
 }

@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       return Response.json({ error: "An occupation code is required." }, { status: 400 });
     }
     const items = await db.select().from(occupationRatings)
-      .where(and(eq(occupationRatings.occupationCode, code), eq(occupationRatings.scaleId, "IM"), like(occupationRatings.elementId, "2.B.%")))
+      .where(and(eq(occupationRatings.occupationCode, code), eq(occupationRatings.scaleId, "IM"), like(occupationRatings.elementId, "2.A.%")))
       .orderBy(desc(occupationRatings.value), asc(occupationRatings.elementName));
     return Response.json({ items });
   } catch {

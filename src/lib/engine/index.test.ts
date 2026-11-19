@@ -89,9 +89,24 @@ describe("occupation ranking", () => {
       { code: "b", title: "Counselor", jobZone: 3, riasec: { realistic: 0, social: 1 } },
       { code: "c", title: "Software Developer", jobZone: 3 },
     ], { riasec: 2, aspirations: 2, workStyles: 0 });
-    expect(result.map((match) => match.occupation.code)).toEqual(["a", "c"]);
+    expect(result.map((match) => match.occupation.code)).toEqual(["a", "c", "b"]);
     expect(result[0].components).toEqual({ riasec: 1, workStyles: null, aspirations: 0.5 });
     expect(result[0].score).toBeCloseTo(0.75);
+  });
+
+  it("includes zones up to the selected horizon and preserves missing zones and aspirations", () => {
+    const result = rankOccupations({
+      jobZones: [1, 3],
+      aspirations: [{ title: "Named", rank: 1 }],
+    }, [
+      { code: "lower", title: "Lower", jobZone: 2 },
+      { code: "equal", title: "Equal", jobZone: 3 },
+      { code: "higher", title: "Higher", jobZone: 4 },
+      { code: "named", title: "Named", jobZone: 5 },
+      { code: "null", title: "Null", jobZone: null },
+      { code: "missing", title: "Missing" },
+    ]);
+    expect(result.map((match) => match.occupation.code).sort()).toEqual(["equal", "lower", "missing", "named", "null"]);
   });
 
   it("renormalizes weights around missing components and never fabricates a score", () => {

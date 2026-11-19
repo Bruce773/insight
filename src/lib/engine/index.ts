@@ -288,11 +288,12 @@ export function rankOccupations<T extends Occupation>(
   }
   if (profile.jobZones?.some((zone) => !validZone(zone))) throw new RangeError("Job zones must be integers from 1 to 5");
   return occupations.filter((occupation) => {
-    if (occupation.jobZone != null && !validZone(occupation.jobZone)) throw new RangeError(`Invalid job zone for ${occupation.code}`);
+    const jobZone = occupation.jobZone;
+    if (jobZone != null && !validZone(jobZone)) throw new RangeError(`Invalid job zone for ${occupation.code}`);
     const aspiration = aspirationFit(occupation.title, aspirations);
     const explicitlyNamed = aspiration !== null && aspiration > 0;
-    return !profile.jobZones?.length || occupation.jobZone == null ||
-      profile.jobZones.some((zone) => occupation.jobZone <= zone) || explicitlyNamed;
+    return !profile.jobZones?.length || jobZone == null ||
+      profile.jobZones.some((zone) => jobZone <= zone) || explicitlyNamed;
   }).map((occupation): OccupationMatch<T> => {
     const components: OccupationMatch["components"] = {
       riasec: interestFit(profile.riasec, occupation.riasec),

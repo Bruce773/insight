@@ -53,6 +53,10 @@ input, textarea { width: 100%; }
 textarea { min-height: 120px; resize: vertical; }
 select { max-width: 100%; }
 .divider { height: 1px; background: var(--line); margin: 36px 0; }
+.optional-exploration { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: 30px; padding: 16px 0; }
+.optional-exploration summary { cursor: pointer; font-weight: 700; }
+.optional-exploration > p { margin: 12px 0; }
+.entered-skills { white-space: pre-wrap; overflow-wrap: anywhere; }
 .optional { font-family: Arial, sans-serif; font-size: 12px; color: var(--muted); font-weight: 400; }
 .hint { color: var(--muted); font-size: 13px; }
 .occupation-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--line); border-radius: 7px; }
@@ -63,7 +67,7 @@ select { max-width: 100%; }
 .selected-occupation { display: flex; justify-content: space-between; gap: 10px; padding: 12px; background: #eaf3e4; margin-bottom: 12px; }
 .skill-row { display: flex; justify-content: space-between; gap: 20px; align-items: center; border-bottom: 1px solid var(--line); padding: 14px 0; }
 .skill-row label { margin: 0; }
-.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; background: #eaf1e4; border-radius: 8px; padding: 24px; overflow-wrap: anywhere; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 20px; background: #eaf1e4; border-radius: 8px; padding: 24px; overflow-wrap: anywhere; }
 .summary span { font-size: 10px; letter-spacing: .1em; font-weight: 800; color: #6c8965; }
 .summary p { margin: 7px 0 0; white-space: pre-wrap; }
 .reflection-list, .saved-list { list-style: none; padding: 0; }

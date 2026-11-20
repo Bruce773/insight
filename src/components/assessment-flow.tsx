@@ -40,13 +40,13 @@ export function isAssessmentResult(value: unknown): value is AssessmentResult {
 export function AssessmentScores({ result }: { result: AssessmentResult }) {
   return (
     <div>
-      <h2>{result.instrument} results</h2>
-      <p>These are sums of your answers after reverse scoring. They are not percentiles or occupation matches.</p>
+      <h2>Your personality traits</h2>
+      <p>Your scores reflect your answers; they are not percentiles or occupation matches.</p>
       <ul className="reflection-list">
         {Object.entries(result.domains).map(([name, score]) => <li key={name}><span>{name}</span><strong>{score.rawScore} / {score.count * 5}</strong></li>)}
       </ul>
       {Object.keys(result.facets).length > 0 && <details>
-        <summary>View facet scores</summary>
+        <summary>View more personality traits</summary>
         <ul className="reflection-list">
           {Object.entries(result.facets).map(([name, score]) => <li key={name}><span>{name}</span><strong>{score.rawScore} / {score.count * 5}</strong></li>)}
         </ul>
@@ -115,7 +115,7 @@ export function AssessmentFlow({ result, onComplete, onSkip, onContinue, onBack 
       <h1>Start with reflection.</h1>
       {question && form ? <>
         <p className="lead">Describe yourself as you generally are now. Choose how accurately each statement describes you.</p>
-        <p className="hint" role="status">Question {index + 1} of {form.items.length} · {form.instrument}</p>
+        <p className="hint" role="status">Question {index + 1} of {form.items.length}</p>
         <p className="hint">{index === form.items.length - 1
           ? "Choose an answer, then select See assessment results."
           : "Click an answer to continue. With a keyboard, use arrow keys to choose, then Space or Next."}</p>
@@ -146,8 +146,8 @@ export function AssessmentFlow({ result, onComplete, onSkip, onContinue, onBack 
         {result ? <><AssessmentScores result={result} /><div className="actions"><button className="primary" onClick={onContinue}>Continue to aspirations →</button></div><p>Or choose another assessment:</p></> :
           <p className="lead">Choose a personality assessment, or continue without one.</p>}
         <div className="cards">
-          <button className="choice" disabled={loading} onClick={() => start("quick")}><span className="tag">QUICK</span><strong>Quick assessment</strong><span>20 questions · Mini-IPIP</span><span className="arrow">Start →</span></button>
-          <button className="choice" disabled={loading} onClick={() => start("full")}><span className="tag">FULL</span><strong>Full assessment</strong><span>120 questions · IPIP-NEO-120</span><span className="arrow">Start →</span></button>
+          <button className="choice" disabled={loading} onClick={() => start("quick")}><span className="tag">QUICK</span><strong>Quick assessment</strong><span>20 questions</span><span className="arrow">Start →</span></button>
+          <button className="choice" disabled={loading} onClick={() => start("full")}><span className="tag">FULL</span><strong>Full assessment</strong><span>120 questions</span><span className="arrow">Start →</span></button>
         </div>
         <p className="hint">Your answers stay on this page until you sign in and save your plan.</p>
         {loading && <p className="hint" role="status">Loading assessment…</p>}

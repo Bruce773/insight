@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, ilike, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, like, or } from "drizzle-orm";
 import { assessmentInstrument, createAssessmentForm } from "@/lib/assessment/forms";
+import { experimentalWorkStyles } from "@/lib/engine/experimental-matching";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");
-  if (!["status", "assessment", "occupations", "skills"].includes(type ?? "")) {
+  if (!["status", "assessment", "occupations", "skills", "skill-list", "workstyles"].includes(type ?? "")) {
     return Response.json({ error: "Unknown catalog request" }, { status: 400 });
   }
   if (!process.env.DATABASE_URL) {
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [{ db }, { assessmentItems, occupations, occupationRatings }] = await Promise.all([
+    const [{ db }, { assessmentItems, occupations, occupationRatings, occWorkStyles }] = await Promise.all([
       import("@/lib/db"),
       import("@/lib/db/schema"),
     ]);
@@ -54,12 +55,32 @@ export async function GET(request: Request) {
       return Response.json({ items });
     }
 
+    if (type === "workstyles") {
+      const items = await db.select({
+        code: occupations.code, title: occupations.title, description: occupations.description,
+        jobZone: occupations.jobZone, elementName: occWorkStyles.elementName, value: occWorkStyles.value,
+      }).from(occWorkStyles).innerJoin(occupations, eq(occWorkStyles.occupationCode, occupations.code))
+        .where(and(eq(occWorkStyles.scaleId, "WI"), inArray(occWorkStyles.elementName, experimentalWorkStyles)));
+      return Response.json({ items }, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    if (type === "skill-list") {
+      const items = await db.selectDistinct({
+        elementId: occupationRatings.elementId, elementName: occupationRatings.elementName,
+      }).from(occupationRatings)
+        .where(and(eq(occupationRatings.scaleId, "IM"),
+          or(like(occupationRatings.elementId, "2.A.%"), like(occupationRatings.elementId, "2.B.%"))))
+        .orderBy(asc(occupationRatings.elementName));
+      return Response.json({ items });
+    }
+
     const code = url.searchParams.get("occupation") ?? "";
     if (!code || code.length > 100) {
       return Response.json({ error: "An occupation code is required." }, { status: 400 });
     }
     const items = await db.select().from(occupationRatings)
-      .where(and(eq(occupationRatings.occupationCode, code), eq(occupationRatings.scaleId, "IM"), like(occupationRatings.elementId, "2.A.%")))
+      .where(and(eq(occupationRatings.occupationCode, code), eq(occupationRatings.scaleId, "IM"),
+        or(like(occupationRatings.elementId, "2.A.%"), like(occupationRatings.elementId, "2.B.%"))))
       .orderBy(desc(occupationRatings.value), asc(occupationRatings.elementName));
     return Response.json({ items });
   } catch {

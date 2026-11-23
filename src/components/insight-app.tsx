@@ -87,7 +87,7 @@ export function InsightApp() {
     getJson("/api/auth/session").then((data) => {
       if (data?.user) {
         setSession("signed-in");
-        getJson("/api/assessment/results").then((result) => setSaved(result.items)).catch(() => {});
+        getJson("/api/assessment/results").then((result) => setSaved(result.items)).catch(() => { });
       } else setSession("guest");
     }).catch(() => setSession("guest"));
   }, []);
@@ -137,7 +137,7 @@ export function InsightApp() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setSaveMessage("Plan saved to your account.");
-      getJson("/api/assessment/results").then((result) => setSaved(result.items)).catch(() => {});
+      getJson("/api/assessment/results").then((result) => setSaved(result.items)).catch(() => { });
     } catch (error) {
       setSaveMessage(error instanceof Error ? error.message : "Your plan could not be saved.");
     }
@@ -160,7 +160,7 @@ export function InsightApp() {
       const response = await fetch("/api/assessment/catalog?type=workstyles", { cache: "no-store" });
       const data: unknown = await response.json();
       if (!response.ok || !data || typeof data !== "object" || !("items" in data) ||
-          !Array.isArray(data.items) || !data.items.every(isWorkStyleRow)) {
+        !Array.isArray(data.items) || !data.items.every(isWorkStyleRow)) {
         throw new Error("The work-style catalog is unavailable or invalid.");
       }
       const ranked = experimentalMatches(plan.assessment, data.items);
@@ -197,22 +197,22 @@ export function InsightApp() {
           {steps.map((item, index) => <button key={item.id} className={step === item.id ? "progress-item active" : "progress-item"} aria-current={step === item.id ? "step" : undefined} onClick={() => setStep(item.id)}><span>{index + 1}</span>{item.label}</button>)}
         </div>
 
-        {step === "welcome" && <section className="hero">
+        <section className="hero step-content" data-visible={step === "welcome"} hidden={step !== "welcome"}>
           <div className="eyebrow">A LITTLE CLARITY GOES A LONG WAY</div>
-          <h1>Make space for<br /><em>what&apos;s next.</em></h1>
-          <p className="lead">Explore your personality, the skills you have, and what you want to work toward.</p>
+          <h1>Consider<br /><em>what&apos;s next.</em></h1>
+          <p className="lead">Explore your personality, the skills you have, and build a roadmap to work towards your goals.</p>
           <div className="actions"><button className="primary" onClick={() => setStep("assessment")}>Get started <span aria-hidden>→</span></button><button className="text-button" onClick={() => setStep("aspirations")}>Skip to my plan →</button></div>
           <p className="hint">Guest progress stays in this page only and is lost on reload. Sign in to save a plan to your account.</p>
-        </section>}
+        </section>
 
-        <section className="content" hidden={step !== "assessment"}>
+        <section className="content step-content" data-visible={step === "assessment"} hidden={step !== "assessment"}>
           <AssessmentFlow key={assessmentSession} result={plan.assessment}
             onComplete={(assessment) => { clearMatches(); setPlan((current) => ({ ...current, assessment, ideaFocus: undefined })); }}
             onSkip={() => { clearMatches(); setPlan((current) => ({ ...current, assessment: undefined, ideaFocus: undefined })); setStep("aspirations"); }}
             onContinue={() => setStep("aspirations")} onBack={() => setStep("welcome")} />
         </section>
 
-        {step === "aspirations" && <section className="content">
+        <section className="content step-content" data-visible={step === "aspirations"} hidden={step !== "aspirations"}>
           <div className="eyebrow">02 / LOOK AHEAD</div>
           <h1>What are you moving toward?</h1>
           <p className="lead">There&apos;s no right answer. Your aspiration can be specific or still taking shape.</p>
@@ -221,28 +221,28 @@ export function InsightApp() {
           <label htmlFor="horizon">Your time horizon</label>
           <select id="horizon" value={plan.horizon} onChange={(e) => setPlan({ ...plan, horizon: e.target.value })}><option value="">Choose one (optional)</option><option>Within 6 months</option><option>6–12 months</option><option>1–3 years</option><option>More than 3 years</option><option>Not sure yet</option></select>
           <details className="optional-exploration" open={occupationOpen} onToggle={(event) => setOccupationOpen(event.currentTarget.open)}>
-          <summary>Explore a specific occupation <span className="optional">optional{plan.occupation ? ` · ${plan.occupation.title} selected` : ""}</span></summary>
-          <p>Choose an occupation to explore its skills, or continue with your aspiration alone.</p>
-          {plan.assessment?.instrument === "IPIP-NEO-120" && <div className="notice">
-            <h3>Experimental occupation comparisons</h3>
-            <p>These unvalidated comparisons do not predict suitability or success and are not for hiring decisions.</p>
-            <button type="button" className="text-button" disabled={matching} onClick={findMatches}>{matching ? "Comparing…" : "Show experimental comparisons →"}</button>
-            {matchMessage && <p role="status">{matchMessage}</p>}
-            {matches && matches.length > 0 && <><p>Similarity is not a probability or percentile. Select an occupation to explore its skills.</p>
-              <div className="occupation-list">{matches.map(({ occupation, score }) => <button key={occupation.code} type="button" onClick={() => setPlan({ ...plan, occupation: { code: occupation.code, title: occupation.title, description: occupation.description, jobZone: occupation.jobZone }, ratings: {}, focusSkill: undefined })} aria-pressed={plan.occupation?.code === occupation.code}>
-                <span><strong>{occupation.title}</strong><small>{occupation.code} · similarity {score?.toFixed(2)} / 1</small></span><span>{plan.occupation?.code === occupation.code ? "Selected ✓" : "Select →"}</span>
-              </button>)}</div></>}
-          </div>}
-          <label htmlFor="occupation-search">Occupation or code</label>
-          <input id="occupation-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search occupations" />
-          <p className="hint" role="status">{catalogMessage}</p>
-          {plan.occupation && <div className="selected-occupation"><strong>Selected: {plan.occupation.title}</strong><button className="text-button" onClick={() => setPlan({ ...plan, occupation: null, ratings: {}, focusSkill: undefined })}>Remove</button></div>}
-          <div className="occupation-list">{occupations.map((occupation) => <button key={occupation.code} onClick={() => setPlan({ ...plan, occupation, ratings: {}, focusSkill: undefined })} aria-pressed={plan.occupation?.code === occupation.code}><span><strong>{occupation.title}</strong><small>{occupation.code}</small></span><span>{plan.occupation?.code === occupation.code ? "Selected ✓" : "Select →"}</span></button>)}</div>
+            <summary>Explore a specific occupation <span className="optional">optional{plan.occupation ? ` · ${plan.occupation.title} selected` : ""}</span></summary>
+            <p>Choose an occupation to explore its skills, or continue with your aspiration alone.</p>
+            {plan.assessment?.instrument === "IPIP-NEO-120" && <div className="notice">
+              <h3>Experimental occupation comparisons</h3>
+              <p>These unvalidated comparisons do not predict suitability or success and are not for hiring decisions.</p>
+              <button type="button" className="text-button" disabled={matching} onClick={findMatches}>{matching ? "Comparing…" : "Show experimental comparisons →"}</button>
+              {matchMessage && <p role="status">{matchMessage}</p>}
+              {matches && matches.length > 0 && <><p>Similarity is not a probability or percentile. Select an occupation to explore its skills.</p>
+                <div className="occupation-list">{matches.map(({ occupation, score }) => <button key={occupation.code} type="button" onClick={() => setPlan({ ...plan, occupation: { code: occupation.code, title: occupation.title, description: occupation.description, jobZone: occupation.jobZone }, ratings: {}, focusSkill: undefined })} aria-pressed={plan.occupation?.code === occupation.code}>
+                  <span><strong>{occupation.title}</strong><small>{occupation.code} · similarity {score?.toFixed(2)} / 1</small></span><span>{plan.occupation?.code === occupation.code ? "Selected ✓" : "Select →"}</span>
+                </button>)}</div></>}
+            </div>}
+            <label htmlFor="occupation-search">Occupation or code</label>
+            <input id="occupation-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search occupations" />
+            <p className="hint" role="status">{catalogMessage}</p>
+            {plan.occupation && <div className="selected-occupation"><strong>Selected: {plan.occupation.title}</strong><button className="text-button" onClick={() => setPlan({ ...plan, occupation: null, ratings: {}, focusSkill: undefined })}>Remove</button></div>}
+            <div className="occupation-list">{occupations.map((occupation) => <button key={occupation.code} onClick={() => setPlan({ ...plan, occupation, ratings: {}, focusSkill: undefined })} aria-pressed={plan.occupation?.code === occupation.code}><span><strong>{occupation.title}</strong><small>{occupation.code}</small></span><span>{plan.occupation?.code === occupation.code ? "Selected ✓" : "Select →"}</span></button>)}</div>
           </details>
           <div className="actions"><button className="primary" onClick={() => setStep("skills")}>Continue to skills →</button><button className="text-button" onClick={() => setStep("assessment")}>Back</button></div>
-        </section>}
+        </section>
 
-        {step === "skills" && <section className="content">
+        <section className="content step-content" data-visible={step === "skills"} hidden={step !== "skills"}>
           <div className="eyebrow">03 / TAKE STOCK</div>
           <h1>Your skills, your perspective.</h1>
           <p className="lead">Take stock of skills you believe you already have. Your reflections are not a test of proficiency.</p>
@@ -251,9 +251,9 @@ export function InsightApp() {
           {plan.occupation && <><h2>Skills for {plan.occupation.title}</h2><p>Optionally, rate your confidence in these skills. Confidence is not a measure of proficiency.</p><p role="status">{skillMessage}</p><div className="skill-list">{skills.map((skill) => <div className="skill-row" key={skill.elementId}><div><strong>{skill.elementName}</strong></div><label><span className="sr-only">Your confidence in {skill.elementName}</span><select value={plan.ratings[skill.elementId] ?? ""} onChange={(e) => { const ratings = { ...plan.ratings }; if (e.target.value) ratings[skill.elementId] = Number(e.target.value); else delete ratings[skill.elementId]; setPlan({ ...plan, ratings }); }}><option value="">Not rated</option><option value="1">1 – Low</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 – High</option></select></label></div>)}</div></>}
           {skills.length > 0 && <><label htmlFor="focus-skill">A skill you want to focus on <span className="optional">optional</span></label><select id="focus-skill" value={plan.focusSkill ?? ""} onChange={(e) => setPlan({ ...plan, focusSkill: e.target.value || undefined })}><option value="">Choose a skill</option>{skills.map((skill) => <option key={skill.elementId} value={skill.elementId}>{skill.elementName}</option>)}</select><p className="hint">Choose your own priority; it is not inferred from your confidence ratings.</p></>}
           <div className="actions"><button className="primary" onClick={() => setStep("results")}>See my plan →</button><button className="text-button" onClick={() => setStep("aspirations")}>Back</button></div>
-        </section>}
+        </section>
 
-        {step === "results" && <section className="content">
+        <section className="content step-content" data-visible={step === "results"} hidden={step !== "results"}>
           <div className="eyebrow">04 / YOUR NEXT CHAPTER</div>
           <h1>A plan that starts with you.</h1>
           <p className="lead">Your aspiration, your skills, and ideas for what to explore next.</p>
@@ -271,7 +271,7 @@ export function InsightApp() {
           {session !== "signed-in" && <p className="hint">Guest entries remain in this page only and will be lost if you leave or sign in.</p>}
           {saveMessage && <p role="status">{saveMessage}</p>}
           {session === "signed-in" && <><div className="divider" /><h2>Saved plans</h2>{saved.length ? <ul className="saved-list">{saved.map((entry) => <li key={entry.id}><span>{new Date(entry.createdAt).toLocaleString()}</span><button className="text-button" onClick={() => loadPlan(entry.payload)}>Open plan →</button></li>)}</ul> : <p>No saved plans to show.</p>}<p className="hint">You can <a href="/api/data/export">export your data</a> or delete your account and its data below.</p><DeleteAccount onDeleted={() => { clearMatches(); setSession("guest"); setSaved([]); setPlan(blankPlan); setAssessmentSession((session) => session + 1); setStep("welcome"); }} /></>}
-        </section>}
+        </section>
       </main>
       <footer><span>✳ InSight</span><Link href="/about" target="_blank" rel="noopener noreferrer" aria-label="About InSight (opens in a new tab)">About</Link></footer>
     </div>

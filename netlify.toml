@@ -1,6 +1,53 @@
+# InSight Netlify Configuration with Neon Database Integration
+# This configuration automatically sets up the app for production deployment
+
 [build]
   command = "pnpm build"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "22"
   NETLIFY_NEXT_SKEW_PROTECTION = "true"
+  # Build-time only. Runtime secrets go in Netlify UI: Functions scope
+  ENVIRONMENT = "production"
+
+# Neon Postgres Integration
+# Automatically provisioned via Netlify's Neon integration
+# After connecting, Netlify sets DATABASE_URL automatically
+[[integrations]]
+  package = "@netlify/neon"
+
+# Functions configuration
+[functions]
+  # Increased timeout for data operations (default is 26s)
+  node_bundler = "esbuild"
+  
+  # Memory per function instance (3008 MB = 3GB, allows for concurrent requests)
+  memory = 3008
+
+# Redirect /api/* to serverless functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Cache static assets aggressively
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    cache-control = "public, max-age=31536000, immutable"
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# NextAuth.js requires secure cookies and HTTPS
+[[headers]]
+  for = "/api/auth/*"
+  [headers.values]
+    cache-control = "no-cache, no-store, must-revalidate"

@@ -15,7 +15,8 @@
     "db:migrate": "drizzle-kit migrate",
     "import:onet": "tsx scripts/import-onet.ts",
     "import:items": "tsx scripts/import-items.ts",
-    "import:demand": "tsx scripts/import-demand.ts"
+    "import:demand": "tsx scripts/import-demand.ts",
+    "setup:production": "tsx scripts/setup-production.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.10.0",

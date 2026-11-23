@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { AssessmentFlow, AssessmentScores, isAssessmentResult } from "@/components/assessment-flow";
 import { LocalIdeas } from "@/components/local-ideas";
+import { LocalModelDownloadModal } from "@/components/local-model-download-modal";
+import { DownloadProgressIndicator } from "@/components/download-progress-indicator";
 import type { AssessmentResult } from "@/lib/engine/assessment";
 import { experimentalMatches, type WorkStyleRow } from "@/lib/engine/experimental-matching";
+import { modelManager } from "@/lib/local-model-manager";
 
 type Occupation = { code: string; title: string; description: string | null; jobZone: number | null };
 type Skill = { elementId: string; elementName: string };
@@ -79,6 +82,8 @@ export function InsightApp() {
   const [matches, setMatches] = useState<ExperimentalMatch[] | null>(null);
   const [matchMessage, setMatchMessage] = useState("");
   const [matching, setMatching] = useState(false);
+  const [showModelModal, setShowModelModal] = useState(false);
+  const modelModalShown = useRef(false);
   const matchRequest = useRef(0);
   const skills = skillState && plan.occupation && skillState.code === plan.occupation.code ? skillState.items : [];
   const skillMessage = !plan.occupation ? "" : skillState?.code === plan.occupation.code ? skillState.message : "Loading skills…";
@@ -90,6 +95,22 @@ export function InsightApp() {
         getJson("/api/assessment/results").then((result) => setSaved(result.items)).catch(() => { });
       } else setSession("guest");
     }).catch(() => setSession("guest"));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || modelModalShown.current) return;
+    modelModalShown.current = true;
+
+    const checkAndShowModal = async () => {
+      const hasDeclined = modelManager.hasUserDeclined();
+      const isCached = await modelManager.isModelCached();
+
+      if (!hasDeclined && !isCached) {
+        setShowModelModal(true);
+      }
+    };
+
+    checkAndShowModal();
   }, []);
 
   useEffect(() => {
@@ -185,8 +206,14 @@ export function InsightApp() {
 
   return (
     <div className="shell">
+      <LocalModelDownloadModal
+        isOpen={showModelModal}
+        onAccept={() => setShowModelModal(false)}
+        onDecline={() => setShowModelModal(false)}
+      />
       <header className="topbar">
         <Link className="brand" href="/" aria-label="InSight home"><span className="brand-mark">✳</span> InSight</Link>
+        <DownloadProgressIndicator />
         <nav className="account" aria-label="Account and information">
           <Link href="/about" target="_blank" rel="noopener noreferrer" aria-label="About InSight (opens in a new tab)">About</Link>
           {session === "signed-in" ? <><a href="/api/data/export">Export data</a><button type="button" onClick={() => signOut({ redirectTo: "/" })}>Sign out</button></> : <Link prefetch={false} href="/api/auth/signin">Sign in</Link>}

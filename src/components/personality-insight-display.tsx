@@ -18,9 +18,12 @@ interface DetailsModalState {
 export function PersonalityInsightDisplay({ result }: { result: AssessmentResult }) {
   const [detailsModal, setDetailsModal] = useState<DetailsModalState>({ trait: null, characteristics: [], workImplications: [] });
   const [mounted, setMounted] = useState(false);
+  const [gradientId, setGradientId] = useState("");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
+    setGradientId(`gradient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   }, []);
 
   const openDetailsModal = (traitName: string, profile: PersonalityProfile) => {
@@ -39,7 +42,7 @@ export function PersonalityInsightDisplay({ result }: { result: AssessmentResult
     <div className="personality-insights">
       <svg width="0" height="0" style={{ position: "absolute" }}>
         <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#67965d" />
             <stop offset="100%" stopColor="#789e67" />
           </linearGradient>
@@ -63,6 +66,12 @@ export function PersonalityInsightDisplay({ result }: { result: AssessmentResult
             <article key={domainName} className="trait-card" onClick={() => openDetailsModal(domainName, profile)}>
               <div className="trait-circle">
                 <svg viewBox="0 0 120 120" className="progress-ring">
+                  <defs>
+                    <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#67965d" />
+                      <stop offset="100%" stopColor="#789e67" />
+                    </linearGradient>
+                  </defs>
                   <circle cx="60" cy="60" r="54" className="progress-ring-bg" />
                   <circle
                     cx="60"
@@ -70,6 +79,7 @@ export function PersonalityInsightDisplay({ result }: { result: AssessmentResult
                     r="54"
                     className="progress-ring-fill"
                     style={{
+                      stroke: `url(#${gradientId})`,
                       strokeDasharray: `${2 * Math.PI * 54}`,
                       strokeDashoffset: `${2 * Math.PI * 54 * (1 - domainScore.score)}`,
                     }}

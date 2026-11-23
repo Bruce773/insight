@@ -62,13 +62,12 @@
 
 .progress-ring-bg {
   fill: none;
-  stroke: rgba(220, 229, 218, 0.3);
+  stroke: rgba(103, 150, 93, 0.15);
   stroke-width: 4;
 }
 
 .progress-ring-fill {
   fill: none;
-  stroke: url(#gradient);
   stroke-width: 4;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.3s ease;

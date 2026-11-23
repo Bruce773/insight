@@ -2,9 +2,11 @@
  * Manages downloading and managing local AI models for browser-based inference
  */
 
+import { toastManager } from "./toast-manager";
+
 const MODEL_DOWNLOAD_KEY = "local-model-download-preference";
-const MODEL_CACHE_NAME = "local-ai-model-v1";
 const MODEL_STATUS_KEY = "local-model-status";
+const MODEL_COMPLETED_KEY = "local-model-completed";
 
 export type ModelStatus = "not-started" | "downloading" | "completed" | "failed";
 
@@ -39,17 +41,13 @@ class LocalModelManager {
   }
 
   /**
-   * Check if model has been downloaded
+   * Check if model has been successfully downloaded and cached
    */
   async isModelCached(): Promise<boolean> {
     if (typeof window === "undefined") return false;
-    try {
-      const cache = await caches.open(MODEL_CACHE_NAME);
-      const response = await cache.match("local-model");
-      return !!response;
-    } catch {
-      return false;
-    }
+    // Check localStorage flag for successful completion
+    // (web-llm caches in IndexedDB, so we track completion with our own flag)
+    return localStorage.getItem(MODEL_COMPLETED_KEY) === "true";
   }
 
   /**
@@ -137,21 +135,25 @@ class LocalModelManager {
       clearInterval(stallDetector);
 
       localStorage.setItem(MODEL_STATUS_KEY, "completed");
+      localStorage.setItem(MODEL_COMPLETED_KEY, "true");
       const completed = { status: "completed" as const, progress: 100 };
       onProgress?.(completed);
       this.notifyProgress(completed);
+      toastManager.success("AI model downloaded successfully");
 
       return true;
     } catch (error) {
       if (!this.downloadController) {
         // Download was cancelled
         localStorage.setItem(MODEL_STATUS_KEY, "not-started");
+        localStorage.removeItem(MODEL_COMPLETED_KEY);
         return false;
       }
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("Model download error:", errorMessage);
       localStorage.setItem(MODEL_STATUS_KEY, "failed");
+      localStorage.removeItem(MODEL_COMPLETED_KEY);
       const failed = {
         status: "failed" as const,
         progress: 0,
@@ -159,6 +161,7 @@ class LocalModelManager {
       };
       onProgress?.(failed);
       this.notifyProgress(failed);
+      toastManager.error(`Model download failed: ${errorMessage}`);
 
       return false;
     } finally {

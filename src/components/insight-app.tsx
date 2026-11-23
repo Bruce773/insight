@@ -8,6 +8,7 @@ import { AssessmentFlow, AssessmentScores, isAssessmentResult } from "@/componen
 import { LocalIdeas } from "@/components/local-ideas";
 import { LocalModelDownloadModal } from "@/components/local-model-download-modal";
 import { DownloadProgressIndicator } from "@/components/download-progress-indicator";
+import { ToastContainer } from "@/components/toast-container";
 import type { AssessmentResult } from "@/lib/engine/assessment";
 import { experimentalMatches, type WorkStyleRow } from "@/lib/engine/experimental-matching";
 import { modelManager } from "@/lib/local-model-manager";
@@ -206,6 +207,7 @@ export function InsightApp() {
 
   return (
     <div className="shell">
+      <ToastContainer />
       <LocalModelDownloadModal
         isOpen={showModelModal}
         onAccept={() => setShowModelModal(false)}
@@ -213,7 +215,7 @@ export function InsightApp() {
       />
       <header className="topbar">
         <Link className="brand" href="/" aria-label="InSight home"><span className="brand-mark">✳</span> InSight</Link>
-        <DownloadProgressIndicator />
+        <DownloadProgressIndicator onOpenModal={() => setShowModelModal(true)} />
         <nav className="account" aria-label="Account and information">
           <Link href="/about" target="_blank" rel="noopener noreferrer" aria-label="About InSight (opens in a new tab)">About</Link>
           {session === "signed-in" ? <><a href="/api/data/export">Export data</a><button type="button" onClick={() => signOut({ redirectTo: "/" })}>Sign out</button></> : <Link prefetch={false} href="/api/auth/signin">Sign in</Link>}

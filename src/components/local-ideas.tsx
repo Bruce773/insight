@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ideaTraits, parseAspirationIdeas, parseIdeaSkills, type AspirationIdea } from "@/lib/engine/aspiration-ideas";
 import type { AssessmentResult } from "@/lib/engine/assessment";
+import { modelManager, type ModelDownloadProgress } from "@/lib/local-model-manager";
+import { XIcon } from "./icon";
 
 export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFocus }: {
   aspiration: string;
@@ -15,14 +17,21 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [running, setRunning] = useState(false);
+  const [modelDownload, setModelDownload] = useState<ModelDownloadProgress>({ status: "not-started", progress: 0 });
   const worker = useRef<Worker | null>(null);
   const controller = useRef<AbortController | null>(null);
   const request = useRef(0);
 
-  useEffect(() => () => {
-    request.current++;
-    controller.current?.abort();
-    worker.current?.terminate();
+  useEffect(() => {
+    const unsubscribe = modelManager.onProgress((progress) => {
+      setModelDownload(progress);
+    });
+    return () => {
+      unsubscribe();
+      request.current++;
+      controller.current?.abort();
+      worker.current?.terminate();
+    };
   }, []);
 
   function cancel() {
@@ -111,11 +120,30 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
     }
   }
 
+  const handleCancelDownload = () => {
+    modelManager.cancelDownload();
+  };
+
   return <section aria-labelledby="local-ideas-heading">
     <div className="divider" />
     <h2 id="local-ideas-heading">Ideas for your next steps <span className="optional">optional</span></h2>
     <p>Explore skills{assessment ? " and personality traits" : ""} related to your aspiration. These AI ideas are unvalidated, not assessments of your abilities. Choose what feels useful.</p>
     <p className="hint">Your entries are processed on your device, not sent to an AI service. First use downloads about 2.4 GB from external model hosts and needs WebGPU, about 4.7 GB of GPU memory, and browser storage. <a href="/about#local-ai" target="_blank" rel="noopener noreferrer">How it works (opens in a new tab)</a></p>
+    {modelDownload.status === "downloading" && (
+      <div className="download-indicator modal-download-indicator">
+        <div className="download-label">Downloading AI model… {modelDownload.progress}%</div>
+        <div className="download-bar">
+          <div className="download-fill" style={{ width: `${modelDownload.progress}%` }} />
+        </div>
+        <button
+          className="download-cancel-icon"
+          onClick={handleCancelDownload}
+          aria-label="Cancel download"
+        >
+          <XIcon />
+        </button>
+      </div>
+    )}
     <button className="primary" type="button" disabled={running} onClick={generate}>{running ? "Working…" : "Download and generate ideas"}</button>
     {running && <button className="text-button" type="button" onClick={cancel}>Cancel</button>}
     {message && <p role="status">{message}</p>}

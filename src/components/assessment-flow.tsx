@@ -9,6 +9,7 @@ import {
   type AssessmentResult,
 } from "@/lib/engine/assessment";
 import type { ScaleResult } from "@/lib/engine";
+import { PersonalityInsightDisplay } from "./personality-insight-display";
 
 function isAssessmentForm(value: unknown, mode: AssessmentMode): value is AssessmentForm {
   if (!value || typeof value !== "object") return false;
@@ -40,17 +41,8 @@ export function isAssessmentResult(value: unknown): value is AssessmentResult {
 export function AssessmentScores({ result }: { result: AssessmentResult }) {
   return (
     <div>
-      <h2>Your personality traits</h2>
-      <p>Your scores reflect your answers; they are not percentiles or occupation matches.</p>
-      <ul className="reflection-list">
-        {Object.entries(result.domains).map(([name, score]) => <li key={name}><span>{name}</span><strong>{score.rawScore} / {score.count * 5}</strong></li>)}
-      </ul>
-      {Object.keys(result.facets).length > 0 && <details>
-        <summary>View more personality traits</summary>
-        <ul className="reflection-list">
-          {Object.entries(result.facets).map(([name, score]) => <li key={name}><span>{name}</span><strong>{score.rawScore} / {score.count * 5}</strong></li>)}
-        </ul>
-      </details>}
+      <h2>Your personality profile</h2>
+      <PersonalityInsightDisplay result={result} />
     </div>
   );
 }
@@ -111,14 +103,8 @@ export function AssessmentFlow({ result, onComplete, onSkip, onContinue, onBack 
   const answered = question ? Object.prototype.hasOwnProperty.call(answers, question.id) : false;
   return (
     <>
-      <div className="eyebrow">01 / GET TO KNOW YOURSELF</div>
-      <h1>Start with reflection.</h1>
       {question && form ? <>
-        <p className="lead">Describe yourself as you generally are now. Choose how accurately each statement describes you.</p>
-        <p className="hint" role="status">Question {index + 1} of {form.items.length}</p>
-        <p className="hint">{index === form.items.length - 1
-          ? "Choose an answer, then select See assessment results."
-          : "Click an answer to continue. With a keyboard, use arrow keys to choose, then Space or Next."}</p>
+        <div className="eyebrow">01 / GET TO KNOW YOURSELF</div>
         <fieldset className="assessment-question"
           onKeyDown={(event) => {
             if (event.key.startsWith("Arrow")) navigatingAnswers.current = true;
@@ -129,6 +115,7 @@ export function AssessmentFlow({ result, onComplete, onSkip, onContinue, onBack 
           }}
           onKeyUp={(event) => { if (event.key.startsWith("Arrow")) navigatingAnswers.current = false; }}>
           <legend ref={questionRef} tabIndex={-1}>{question.text}</legend>
+          <p className="hint" role="status">Question {index + 1} of {form.items.length}</p>
           {ASSESSMENT_OPTIONS.map((option) => <label key={option.value} className="assessment-option">
             <input type="radio" name={`assessment-${question.id}`} value={option.value} checked={answers[question.id] === option.value}
               onChange={() => setAnswers((current) => ({ ...current, [question.id]: option.value }))}

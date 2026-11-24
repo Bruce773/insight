@@ -4,10 +4,11 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { RoadmapStepCard } from "@/components/roadmap-step-card";
 import type { Duration, Roadmap, RoadmapSkill, RoadmapStep } from "@/lib/engine/roadmap";
 
-export function RoadmapBuilder({ duration, roadmap, onChange }: {
+export function RoadmapBuilder({ duration, roadmap, onChange, onSetDuration }: {
   duration?: Duration;
   roadmap: Roadmap;
   onChange: (roadmap: Roadmap) => void;
+  onSetDuration: () => void;
 }) {
   const [skillName, setSkillName] = useState("");
   const [stepText, setStepText] = useState("");
@@ -102,38 +103,15 @@ export function RoadmapBuilder({ duration, roadmap, onChange }: {
     setMoveMessage(`${item.text.trim() || "Step"} moved to position ${destination + 1} of ${steps.length}.`);
   }
 
-  return <section aria-labelledby="roadmap-heading">
-    <div className="divider" />
-    <div className="eyebrow">YOUR ROADMAP</div>
-    <h2 id="roadmap-heading">Make a plan that feels like yours.</h2>
-    <p>Choose your priorities, then add steps at a pace that works for you. This is a plan to revisit, not a prediction.</p>
-    {duration ? <div className="roadmap-horizon"><strong>Your timeline</strong><span>{duration.amount} {duration.unit}</span></div> :
-      <div className="notice">Choose an exact duration on the Aspirations step to generate a timed roadmap. You can still add your own skills and steps here.</div>}
+  return <section className="roadmap-section" aria-labelledby="roadmap-heading">
+    <div className="roadmap-section-heading">
+      <div><div className="eyebrow">YOUR NEXT CHAPTER</div><h2 id="roadmap-heading">Your roadmap</h2></div>
+      {duration && <span className="roadmap-duration">{duration.amount} {duration.unit}</span>}
+    </div>
+    <p className="roadmap-intro">A plan to revisit, not a prediction. Add the steps that feel right for you.</p>
+    {!duration && <div className="roadmap-duration-notice"><span>Set an exact duration to generate a timed roadmap.</span><button type="button" className="text-button" onClick={onSetDuration}>Set your timeline →</button></div>}
 
-    <h3>Skills to prioritize</h3>
-    <p className="hint">The order is your choice. Move skills up or down to change their priority.</p>
-    {roadmap.skills.length > 0 ? <ol className="roadmap-list">{roadmap.skills.map((skill, index) => <li className="roadmap-item" key={skill.id}>
-      <div className="roadmap-item-body"><strong>#{index + 1} {skill.name}</strong>{skill.review && <span className="roadmap-review">Review after changes</span>}</div>
-      <div className="roadmap-controls">
-        <button type="button" className="text-button" disabled={index === 0} onClick={() => onChange({ ...roadmap, skills: move(roadmap.skills, index, -1) })} aria-label={`Move ${skill.name} up`}>↑</button>
-        <button type="button" className="text-button" disabled={index === roadmap.skills.length - 1} onClick={() => onChange({ ...roadmap, skills: move(roadmap.skills, index, 1) })} aria-label={`Move ${skill.name} down`}>↓</button>
-        {skill.review && <button type="button" className="text-button" onClick={() => updateSkill(skill.id, { review: false })}>Reviewed</button>}
-        <button type="button" className="text-button" onClick={() => onChange({ ...roadmap, skills: roadmap.skills.filter((item) => item.id !== skill.id) })} aria-label={`Remove ${skill.name}`}>Remove</button>
-      </div>
-    </li>)}</ol> : <p className="hint">Add your own skills or choose from the AI ideas below.</p>}
-    <form className="roadmap-add" onSubmit={(event) => {
-      event.preventDefault();
-      const name = skillName.trim();
-      if (!name || roadmap.skills.length >= 100) return;
-      onChange({ ...roadmap, skills: [...roadmap.skills, { id: crypto.randomUUID(), name, source: "user" }] });
-      setSkillName("");
-    }}>
-      <label htmlFor="roadmap-skill">Add a skill of your own</label>
-      <div className="roadmap-input-row"><input id="roadmap-skill" maxLength={200} value={skillName} onChange={(event) => setSkillName(event.target.value)} placeholder="A skill you want to develop" /><button className="primary" type="submit" disabled={!skillName.trim() || roadmap.skills.length >= 100}>Add skill</button></div>
-    </form>
-
-    <h3>Your steps</h3>
-    <p className="hint">{duration ? `Place steps within your ${duration.amount}-${duration.unit} timeline.` : "Add steps now and choose their timing after setting a duration."} Drag a handle to reorder, or open a step to use the move buttons.</p>
+    {roadmap.steps.length > 0 && <p className="hint">{duration ? `Place steps within your ${duration.amount}-${duration.unit} timeline.` : "Add steps now and choose their timing after setting a duration."} Drag a handle to reorder, or open a step to use the move buttons.</p>}
     <p className="sr-only" aria-live="polite">{moveMessage}</p>
     {roadmap.steps.length > 0 ? <ol className="roadmap-list">{roadmap.steps.map((step, index) => <RoadmapStepCard key={step.id} step={step} index={index} count={roadmap.steps.length} duration={duration}
       dragging={draggingId === step.id} dropPosition={dropTarget?.id === step.id ? dropTarget.position : undefined}
@@ -143,8 +121,10 @@ export function RoadmapBuilder({ duration, roadmap, onChange }: {
         onChange({ ...roadmap, steps: move(roadmap.steps, index, direction) });
         setMoveMessage(`${step.text.trim() || "Step"} moved to position ${index + direction + 1} of ${roadmap.steps.length}.`);
       }}
-      onRemove={() => onChange({ ...roadmap, steps: roadmap.steps.filter((item) => item.id !== step.id) })} />)}</ol> : <p className="hint">Your roadmap is empty. Add a step or request local AI suggestions below.</p>}
-    <form className="roadmap-add" onSubmit={(event) => {
+      onRemove={() => onChange({ ...roadmap, steps: roadmap.steps.filter((item) => item.id !== step.id) })} />)}</ol> : <div className="roadmap-empty"><strong>Your roadmap starts here.</strong><p>Add a step yourself or use local AI to generate suggestions.</p></div>}
+    <details className="roadmap-disclosure roadmap-manual-step">
+      <summary>Add a step manually</summary>
+      <form className="roadmap-add" onSubmit={(event) => {
       event.preventDefault();
       const text = stepText.trim();
       if (!text || roadmap.steps.length >= 100 || (duration && stepAt > duration.amount)) return;
@@ -155,6 +135,31 @@ export function RoadmapBuilder({ duration, roadmap, onChange }: {
       <textarea id="roadmap-new-step" maxLength={500} value={stepText} onChange={(event) => setStepText(event.target.value)} placeholder="What would you like to do?" />
       {duration && <><label htmlFor="roadmap-new-time">When ({duration.unit})</label><input id="roadmap-new-time" className="roadmap-time" type="number" min="1" max={duration.amount} value={stepAt} onChange={(event) => setStepAt(Number(event.target.value))} /></>}
       <div className="actions"><button className="primary" type="submit" disabled={!stepText.trim() || roadmap.steps.length >= 100 || !Number.isInteger(stepAt) || stepAt < 1 || !!duration && stepAt > duration.amount}>Add step</button></div>
-    </form>
+      </form>
+    </details>
+
+    <details className="roadmap-disclosure roadmap-priorities">
+      <summary>Skills to prioritize <span className="optional">{roadmap.skills.length ? ` · ${roadmap.skills.length} selected` : " · optional"}{roadmap.skills.some((skill) => skill.review) ? " · review needed" : ""}</span></summary>
+      <p className="hint">The order is your choice. Move skills up or down to change their priority.</p>
+      {roadmap.skills.length > 0 ? <ol className="roadmap-list">{roadmap.skills.map((skill, index) => <li className="roadmap-item" key={skill.id}>
+        <div className="roadmap-item-body"><strong>#{index + 1} {skill.name}</strong>{skill.review && <span className="roadmap-review">Review after changes</span>}</div>
+        <div className="roadmap-controls">
+          <button type="button" className="text-button" disabled={index === 0} onClick={() => onChange({ ...roadmap, skills: move(roadmap.skills, index, -1) })} aria-label={`Move ${skill.name} up`}>↑</button>
+          <button type="button" className="text-button" disabled={index === roadmap.skills.length - 1} onClick={() => onChange({ ...roadmap, skills: move(roadmap.skills, index, 1) })} aria-label={`Move ${skill.name} down`}>↓</button>
+          {skill.review && <button type="button" className="text-button" onClick={() => updateSkill(skill.id, { review: false })}>Reviewed</button>}
+          <button type="button" className="text-button" onClick={() => onChange({ ...roadmap, skills: roadmap.skills.filter((item) => item.id !== skill.id) })} aria-label={`Remove ${skill.name}`}>Remove</button>
+        </div>
+      </li>)}</ol> : <p className="hint">Add your own skills or choose from the AI ideas.</p>}
+      <form className="roadmap-add" onSubmit={(event) => {
+        event.preventDefault();
+        const name = skillName.trim();
+        if (!name || roadmap.skills.length >= 100) return;
+        onChange({ ...roadmap, skills: [...roadmap.skills, { id: crypto.randomUUID(), name, source: "user" }] });
+        setSkillName("");
+      }}>
+        <label htmlFor="roadmap-skill">Add a skill of your own</label>
+        <div className="roadmap-input-row"><input id="roadmap-skill" maxLength={200} value={skillName} onChange={(event) => setSkillName(event.target.value)} placeholder="A skill you want to develop" /><button className="primary" type="submit" disabled={!skillName.trim() || roadmap.skills.length >= 100}>Add skill</button></div>
+      </form>
+    </details>
   </section>;
 }

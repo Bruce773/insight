@@ -23,7 +23,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
   const [steps, setSteps] = useState<{ priorities: string; items: StepSuggestion[] } | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [running, setRunning] = useState(false);
+  const [runningMode, setRunningMode] = useState<"ideas" | "roadmap" | null>(null);
   const [modelDownload, setModelDownload] = useState<ModelDownloadProgress>({ status: "not-started", progress: 0 });
   const [modelCached, setModelCached] = useState(false);
   const [confirmRemoval, setConfirmRemoval] = useState(false);
@@ -34,6 +34,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
   const request = useRef(0);
   const roadmapRef = useRef(roadmap);
   const priorities = JSON.stringify(roadmap.skills.map(({ id, name }) => ({ id, name })));
+  const running = runningMode !== null;
   useEffect(() => {
     roadmapRef.current = roadmap;
   }, [roadmap]);
@@ -63,7 +64,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
     controller.current?.abort();
     worker.current?.terminate();
     worker.current = null;
-    setRunning(false);
+    setRunningMode(null);
     setMessage("Generation cancelled.");
   }
 
@@ -95,7 +96,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
     const id = ++request.current;
     const abort = new AbortController();
     controller.current = abort;
-    setRunning(true);
+    setRunningMode(mode);
     if (mode === "ideas") setIdeas(null);
     else setSteps(null);
     setError("");
@@ -150,14 +151,14 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
         } finally {
           instance.terminate();
           worker.current = null;
-          setRunning(false);
+          setRunningMode(null);
         }
       };
       instance.onerror = () => {
         if (id !== request.current) return;
         instance.terminate();
         worker.current = null;
-        setRunning(false);
+        setRunningMode(null);
         setMessage("");
         setError("The local model worker failed to start or stopped unexpectedly. Check browser support and try again.");
       };
@@ -166,7 +167,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
         : { type: "ideas", aspiration, currentSkills, skills, traits });
     } catch (error) {
       if (id !== request.current) return;
-      setRunning(false);
+      setRunningMode(null);
       setMessage("");
       setError(error instanceof Error ? error.message : "Local generation failed.");
     }
@@ -189,11 +190,15 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
     }
   }
 
-  return <section aria-labelledby="local-ideas-heading">
-    <div className="divider" />
-    <h2 id="local-ideas-heading">Ideas for your next steps <span className="optional">optional</span></h2>
-    <p>Explore skills{assessment ? " and personality traits" : ""} related to your aspiration. These AI ideas are unvalidated, not assessments of your abilities. Choose what feels useful.</p>
-    <p className="hint">Your entries are processed on your device, not sent to an AI service. {!modelCached && "First use downloads about 2.4 GB from external model hosts and "}needs WebGPU, about 4.7 GB of GPU memory, and browser storage. <a href="/about#local-ai" target="_blank" rel="noopener noreferrer">How it works (opens in a new tab)</a></p>
+  return <section className="generation-card" aria-labelledby="local-ideas-heading">
+    <div className="generation-heading">
+      <div>
+        <div className="eyebrow">A STARTING POINT · OPTIONAL</div>
+        <h2 id="local-ideas-heading">Generate your roadmap</h2>
+        <p>Get ideas for steps toward your aspiration. Choose what to add and make it your own.</p>
+      </div>
+    </div>
+    <p className="hint generation-privacy">Your entries stay on your device. Requires WebGPU, about 4.7 GB of GPU memory, and browser storage. {!modelCached && "First use downloads about 2.4 GB from external model hosts. "}<a href="/about#local-ai" target="_blank" rel="noopener noreferrer">How it works (opens in a new tab)</a></p>
     {modelDownload.status === "downloading" && (
       <div className="download-indicator modal-download-indicator">
         <div className="download-label">Downloading AI model… {modelDownload.progress}%</div>
@@ -209,30 +214,30 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
         </button>
       </div>
     )}
-    <button className="primary" type="button" disabled={running || removing || modelDownload.status === "downloading"} onClick={() => generate("ideas")}>
-      {running ? "Working…" : modelCached ? "Generate ideas" : "Download and generate ideas"}
-    </button>
-    {running && <button className="text-button" type="button" onClick={cancel}>Cancel</button>}
+    <div className="generation-actions">
+      <button className="primary" type="button" disabled={running || removing || modelDownload.status === "downloading"} onClick={() => generate("roadmap")}>
+        {runningMode === "roadmap" ? "Generating…" : roadmap.steps.length ? "Suggest more roadmap steps" : "Generate starter roadmap"}
+      </button>
+      <button className="text-button generation-secondary" type="button" disabled={running || removing || modelDownload.status === "downloading"} onClick={() => generate("ideas")}>
+        {runningMode === "ideas" ? "Generating skill ideas…" : modelCached ? "Generate skill ideas" : "Download and generate skill ideas"}
+      </button>
+      {running && <button className="text-button" type="button" onClick={cancel}>Cancel</button>}
+    </div>
+    <p className="hint generation-disclaimer">AI suggestions are unvalidated, not assessments of your abilities. Review each step before adding it; your existing steps won&apos;t be replaced.</p>
     {message && <p role="status">{message}</p>}
     {error && <p role="alert">{error}</p>}
-    {ideas && <ul className="reflection-list">{ideas.map(({ skill, trait }) => <li key={skill.elementId}>
-        <span><strong>{skill.elementName}</strong>{trait && <small> · Personality trait to reflect on: {trait.name}, {trait.result.rawScore} / {trait.result.count * 5}</small>}</span>
-        <button type="button" className="text-button" aria-pressed={roadmap.skills.some((item) => item.name === skill.elementName)} onClick={() => { onFocus(skill.elementName); onAddSkill(skill.elementName); }}>{roadmap.skills.some((item) => item.name === skill.elementName) ? "Added" : focus === skill.elementName ? "Add priority" : "Choose priority"}</button>
-      </li>)}</ul>}
-    <div className="actions">
-      <button className="primary" type="button" disabled={running || removing || modelDownload.status === "downloading"} onClick={() => generate("roadmap")}>
-        {roadmap.steps.length ? "Suggest more roadmap steps" : "Generate starter roadmap"}
-      </button>
-    </div>
-    <p className="hint">Suggestions are generated on your device and may be inaccurate. Review each one before adding it; your existing steps will not be replaced.</p>
-    {steps && steps.priorities === priorities && <ul className="roadmap-list">{steps.items.map((step, index) => <li className="roadmap-item" key={`${index}-${step.text}`}>
+    {steps && steps.priorities === priorities && steps.items.length > 0 && <><h3 className="generation-results-heading">Suggested steps</h3><ul className="roadmap-list">{steps.items.map((step, index) => <li className="roadmap-item" key={`${index}-${step.text}`}>
       <span>{step.text} <small> · {duration?.unit} {step.at}</small></span>
       <div className="roadmap-controls">
         <button type="button" className="text-button" disabled={roadmap.steps.length >= 100} onClick={() => { onAddStep(step); setSteps((current) => current ? { ...current, items: current.items.filter((_, i) => i !== index) } : null); }}>Add step</button>
         <button type="button" className="text-button" onClick={() => setSteps((current) => current ? { ...current, items: current.items.filter((_, i) => i !== index) } : null)} aria-label={`Dismiss suggestion ${index + 1}`}>Dismiss</button>
       </div>
-    </li>)}</ul>}
-    {(modelCached || confirmRemoval) && <details className="optional-exploration">
+    </li>)}</ul></>}
+    {ideas && <><h3 className="generation-results-heading">Skill ideas</h3><ul className="reflection-list">{ideas.map(({ skill, trait }) => <li key={skill.elementId}>
+        <span><strong>{skill.elementName}</strong>{trait && <small> · Personality trait to reflect on: {trait.name}, {trait.result.rawScore} / {trait.result.count * 5}</small>}</span>
+        <button type="button" className="text-button" aria-pressed={roadmap.skills.some((item) => item.name === skill.elementName)} onClick={() => { onFocus(skill.elementName); onAddSkill(skill.elementName); }}>{roadmap.skills.some((item) => item.name === skill.elementName) ? "Added" : focus === skill.elementName ? "Add priority" : "Choose priority"}</button>
+      </li>)}</ul></>}
+    {(modelCached || confirmRemoval) && <details className="generation-model-settings">
       <summary>Manage local AI model</summary>
       <p className="hint">Remove the model from this browser to free storage. You can download it again later.</p>
       {confirmRemoval ? <div className="notice">

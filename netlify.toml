@@ -4,6 +4,7 @@
 [build]
   command = "pnpm build"
   functions = "netlify/functions"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "22"

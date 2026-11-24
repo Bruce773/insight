@@ -9,6 +9,7 @@ import { LocalIdeas } from "@/components/local-ideas";
 import { LocalModelDownloadModal } from "@/components/local-model-download-modal";
 import { DownloadProgressIndicator } from "@/components/download-progress-indicator";
 import { ToastContainer } from "@/components/toast-container";
+import { AuthModal } from "@/components/auth-modal";
 import type { AssessmentResult } from "@/lib/engine/assessment";
 import { experimentalMatches, type WorkStyleRow } from "@/lib/engine/experimental-matching";
 import { modelManager } from "@/lib/local-model-manager";
@@ -84,6 +85,7 @@ export function InsightApp() {
   const [matchMessage, setMatchMessage] = useState("");
   const [matching, setMatching] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const modelModalShown = useRef(false);
   const matchRequest = useRef(0);
   const skills = skillState && plan.occupation && skillState.code === plan.occupation.code ? skillState.items : [];
@@ -213,12 +215,13 @@ export function InsightApp() {
         onAccept={() => setShowModelModal(false)}
         onDecline={() => setShowModelModal(false)}
       />
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
       <header className="topbar">
         <Link className="brand" href="/" aria-label="InSight home"><span className="brand-mark">✳</span> InSight</Link>
         <DownloadProgressIndicator onOpenModal={() => setShowModelModal(true)} />
         <nav className="account" aria-label="Account and information">
           <Link href="/about" target="_blank" rel="noopener noreferrer" aria-label="About InSight (opens in a new tab)">About</Link>
-          {session === "signed-in" ? <><a href="/api/data/export">Export data</a><button type="button" onClick={() => signOut({ redirectTo: "/" })}>Sign out</button></> : <Link prefetch={false} href="/api/auth/signin">Sign in</Link>}
+          {session === "signed-in" ? <><a href="/api/data/export">Export data</a><button type="button" onClick={() => signOut({ redirectTo: "/" })}>Sign out</button></> : <button type="button" className="account-signin" onClick={() => setShowAuthModal(true)}>Sign in</button>}
         </nav>
       </header>
       <main>
@@ -296,7 +299,7 @@ export function InsightApp() {
           <LocalIdeas key={JSON.stringify([plan.aspiration, plan.currentSkills, plan.assessment])} aspiration={plan.aspiration} currentSkills={plan.currentSkills ?? ""} assessment={plan.assessment} focus={plan.ideaFocus} onFocus={(ideaFocus) => setPlan((current) => ({ ...current, ideaFocus }))} />
           <label htmlFor="action">One next step you want to take</label>
           <textarea id="action" value={plan.action} maxLength={4000} onChange={(e) => setPlan({ ...plan, action: e.target.value })} placeholder="Write an action that feels useful to you." />
-          <div className="actions">{session === "signed-in" ? <button className="primary" onClick={savePlan}>Save my plan</button> : <Link prefetch={false} className="primary" href="/api/auth/signin">Sign in to save</Link>}<button className="text-button" onClick={() => setStep("skills")}>Back to skills</button></div>
+          <div className="actions">{session === "signed-in" ? <button className="primary" onClick={savePlan}>Save my plan</button> : <button type="button" className="primary" onClick={() => setShowAuthModal(true)}>Sign in to save</button>}<button className="text-button" onClick={() => setStep("skills")}>Back to skills</button></div>
           {session !== "signed-in" && <p className="hint">Guest entries remain in this page only and will be lost if you leave or sign in.</p>}
           {saveMessage && <p role="status">{saveMessage}</p>}
           {session === "signed-in" && <><div className="divider" /><h2>Saved plans</h2>{saved.length ? <ul className="saved-list">{saved.map((entry) => <li key={entry.id}><span>{new Date(entry.createdAt).toLocaleString()}</span><button className="text-button" onClick={() => loadPlan(entry.payload)}>Open plan →</button></li>)}</ul> : <p>No saved plans to show.</p>}<p className="hint">You can <a href="/api/data/export">export your data</a> or delete your account and its data below.</p><DeleteAccount onDeleted={() => { clearMatches(); setSession("guest"); setSaved([]); setPlan(blankPlan); setAssessmentSession((session) => session + 1); setStep("welcome"); }} /></>}

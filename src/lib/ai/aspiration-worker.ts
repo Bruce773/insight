@@ -1,14 +1,16 @@
 import { CreateMLCEngine } from "@mlc-ai/web-llm";
 import type { IdeaSkill, IdeaTrait } from "@/lib/engine/aspiration-ideas";
+import { LOCAL_MODEL_ID } from "@/lib/local-model-manager";
 
 type Request = { aspiration: string; currentSkills: string; skills: IdeaSkill[]; traits: IdeaTrait[] };
 
 self.addEventListener("message", async (event: MessageEvent<Request>) => {
   const { aspiration, currentSkills, skills, traits } = event.data;
   try {
-    const engine = await CreateMLCEngine("Qwen3.5-4B-q4f32_1-MLC", {
+    const engine = await CreateMLCEngine(LOCAL_MODEL_ID, {
       initProgressCallback: ({ text, progress }) => self.postMessage({ type: "progress", text, progress }, { transfer: [] }),
     });
+    self.postMessage({ type: "model-ready", text: "" }, { transfer: [] });
     self.postMessage({ type: "progress", text: "Generating ideas on your device…", progress: 1 }, { transfer: [] });
     const response = await engine.chat.completions.create({
       messages: [

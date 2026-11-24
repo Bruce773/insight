@@ -7,6 +7,7 @@ import { toastManager } from "./toast-manager";
 const MODEL_DOWNLOAD_KEY = "local-model-download-preference";
 const MODEL_STATUS_KEY = "local-model-status";
 const MODEL_COMPLETED_KEY = "local-model-completed";
+export const LOCAL_MODEL_ID = "Qwen3.5-4B-q4f32_1-MLC";
 
 export type ModelStatus = "not-started" | "downloading" | "completed" | "failed";
 
@@ -21,6 +22,9 @@ export interface ModelDownloadProgress {
 class LocalModelManager {
   private static instance: LocalModelManager;
   private downloadController: AbortController | null = null;
+  private downloadActive = false;
+  private removing = false;
+  private cacheRevision = 0;
   private progressCallbacks: Set<(progress: ModelDownloadProgress) => void> = new Set();
 
   private constructor() {}
@@ -45,9 +49,50 @@ class LocalModelManager {
    */
   async isModelCached(): Promise<boolean> {
     if (typeof window === "undefined") return false;
-    // Check localStorage flag for successful completion
-    // (web-llm caches in IndexedDB, so we track completion with our own flag)
-    return localStorage.getItem(MODEL_COMPLETED_KEY) === "true";
+    const revision = this.cacheRevision;
+    const { hasModelInCache } = await import("@mlc-ai/web-llm");
+    const cached = await hasModelInCache(LOCAL_MODEL_ID);
+    if (this.removing) return false;
+    if (revision !== this.cacheRevision) return localStorage.getItem(MODEL_COMPLETED_KEY) === "true";
+    if (cached !== (localStorage.getItem(MODEL_COMPLETED_KEY) === "true")) {
+      this.setCached(cached);
+    }
+    return cached;
+  }
+
+  private setCached(cached: boolean): void {
+    this.cacheRevision++;
+    if (cached) {
+      localStorage.setItem(MODEL_COMPLETED_KEY, "true");
+      localStorage.setItem(MODEL_STATUS_KEY, "completed");
+    } else {
+      localStorage.removeItem(MODEL_COMPLETED_KEY);
+      localStorage.setItem(MODEL_STATUS_KEY, "not-started");
+    }
+    this.notifyProgress({ status: cached ? "completed" : "not-started", progress: cached ? 100 : 0 });
+  }
+
+  markModelReady(): void {
+    this.setCached(true);
+  }
+
+  async removeModel(): Promise<void> {
+    if (this.downloadActive || this.removing) {
+      throw new Error("Wait for the model download to finish before removing it.");
+    }
+    this.removing = true;
+    try {
+      const { deleteModelAllInfoInCache } = await import("@mlc-ai/web-llm");
+      await deleteModelAllInfoInCache(LOCAL_MODEL_ID);
+      this.setUserPreference(true);
+      this.setCached(false);
+    } catch (error) {
+      // Removal can fail after deleting some files, so do not claim the model is ready.
+      this.setCached(false);
+      throw error;
+    } finally {
+      this.removing = false;
+    }
   }
 
   /**
@@ -77,18 +122,24 @@ class LocalModelManager {
    */
   async startDownload(onProgress?: (progress: ModelDownloadProgress) => void): Promise<boolean> {
     if (typeof window === "undefined") return false;
-
-    // Check if already cached
-    const isCached = await this.isModelCached();
-    if (isCached) {
-      onProgress?.({ status: "completed", progress: 100 });
-      return true;
+    if (this.downloadActive || this.removing) {
+      toastManager.info("Wait for the current model operation to finish.");
+      return false;
     }
-
+    this.downloadActive = true;
     this.downloadController = new AbortController();
-    localStorage.setItem(MODEL_STATUS_KEY, "downloading");
+    const controller = this.downloadController;
+    let stallDetector: ReturnType<typeof setInterval> | undefined;
+    let modelLoaded = false;
 
     try {
+      const isCached = await this.isModelCached();
+      if (controller.signal.aborted) return false;
+      if (isCached) {
+        onProgress?.({ status: "completed", progress: 100 });
+        return true;
+      }
+      localStorage.setItem(MODEL_STATUS_KEY, "downloading");
       const progressUpdate = { status: "downloading" as const, progress: 0 };
       onProgress?.(progressUpdate);
       this.notifyProgress(progressUpdate);
@@ -101,9 +152,9 @@ class LocalModelManager {
       let lastProgressTime = Date.now();
       const STALL_TIMEOUT = 30000; // 30 seconds without progress
       
-      const downloadPromise = CreateMLCEngine("Qwen3.5-4B-q4f32_1-MLC", {
+      const downloadPromise = CreateMLCEngine(LOCAL_MODEL_ID, {
         initProgressCallback: ({ progress }) => {
-          if (!this.downloadController) return; // Download was cancelled
+          if (controller.signal.aborted) return;
           
           const numProgress = Math.round(progress * 100);
           if (numProgress !== lastProgress) {
@@ -118,8 +169,8 @@ class LocalModelManager {
       });
 
       // Set up a stall detector to handle stuck downloads
-      const stallDetector = setInterval(() => {
-        if (!this.downloadController) {
+      stallDetector = setInterval(() => {
+        if (controller.signal.aborted) {
           clearInterval(stallDetector);
           return;
         }
@@ -131,19 +182,18 @@ class LocalModelManager {
         }
       }, 5000); // Check every 5 seconds
 
-      await downloadPromise;
-      clearInterval(stallDetector);
-
-      localStorage.setItem(MODEL_STATUS_KEY, "completed");
-      localStorage.setItem(MODEL_COMPLETED_KEY, "true");
+      const engine = await downloadPromise;
+      await engine.unload();
+      modelLoaded = true;
+      if (controller.signal.aborted) return false;
       const completed = { status: "completed" as const, progress: 100 };
       onProgress?.(completed);
-      this.notifyProgress(completed);
+      this.markModelReady();
       toastManager.success("AI model downloaded successfully");
 
       return true;
     } catch (error) {
-      if (!this.downloadController) {
+      if (controller.signal.aborted) {
         // Download was cancelled
         localStorage.setItem(MODEL_STATUS_KEY, "not-started");
         localStorage.removeItem(MODEL_COMPLETED_KEY);
@@ -165,7 +215,10 @@ class LocalModelManager {
 
       return false;
     } finally {
+      if (stallDetector) clearInterval(stallDetector);
+      if (controller.signal.aborted) this.setCached(modelLoaded);
       this.downloadController = null;
+      this.downloadActive = false;
     }
   }
 
@@ -175,7 +228,6 @@ class LocalModelManager {
   cancelDownload(): void {
     if (this.downloadController) {
       this.downloadController.abort();
-      this.downloadController = null;
     }
   }
 
@@ -184,8 +236,17 @@ class LocalModelManager {
    */
   onProgress(callback: (progress: ModelDownloadProgress) => void): () => void {
     this.progressCallbacks.add(callback);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === MODEL_STATUS_KEY) {
+        this.cacheRevision++;
+        const status = this.getDownloadStatus();
+        callback({ status, progress: status === "completed" ? 100 : 0 });
+      }
+    };
+    window.addEventListener("storage", onStorage);
     return () => {
       this.progressCallbacks.delete(callback);
+      window.removeEventListener("storage", onStorage);
     };
   }
 

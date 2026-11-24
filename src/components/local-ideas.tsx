@@ -19,6 +19,9 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
   const [running, setRunning] = useState(false);
   const [modelDownload, setModelDownload] = useState<ModelDownloadProgress>({ status: "not-started", progress: 0 });
   const [modelCached, setModelCached] = useState(false);
+  const [confirmRemoval, setConfirmRemoval] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removalError, setRemovalError] = useState("");
   const worker = useRef<Worker | null>(null);
   const controller = useRef<AbortController | null>(null);
   const request = useRef(0);
@@ -26,12 +29,13 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
   useEffect(() => {
     const unsubscribe = modelManager.onProgress((progress) => {
       setModelDownload(progress);
-      if (progress.status === "completed") {
-        setModelCached(true);
-      }
+      if (progress.status === "completed") setModelCached(true);
+      if (progress.status === "not-started") setModelCached(false);
     });
 
-    modelManager.isModelCached().then(setModelCached);
+    modelManager.isModelCached().then(setModelCached).catch((error) => {
+      setRemovalError(error instanceof Error ? error.message : "Could not check the local model.");
+    });
 
     return () => {
       unsubscribe();
@@ -88,6 +92,10 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
       worker.current = instance;
       instance.onmessage = (event: MessageEvent<{ type: string; text: string; progress?: number }>) => {
         if (id !== request.current) return;
+        if (event.data.type === "model-ready") {
+          modelManager.markModelReady();
+          return;
+        }
         if (event.data.type === "progress") {
           const progress = event.data.progress;
           setMessage(event.data.text === "Generating ideas on your device…" ? event.data.text :
@@ -131,6 +139,19 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
     modelManager.cancelDownload();
   };
 
+  async function removeModel() {
+    setRemoving(true);
+    setRemovalError("");
+    try {
+      await modelManager.removeModel();
+      setConfirmRemoval(false);
+    } catch (error) {
+      setRemovalError(error instanceof Error ? error.message : "Could not remove the local model.");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
   return <section aria-labelledby="local-ideas-heading">
     <div className="divider" />
     <h2 id="local-ideas-heading">Ideas for your next steps <span className="optional">optional</span></h2>
@@ -151,7 +172,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
         </button>
       </div>
     )}
-    <button className="primary" type="button" disabled={running} onClick={generate}>
+    <button className="primary" type="button" disabled={running || removing || modelDownload.status === "downloading"} onClick={generate}>
       {running ? "Working…" : modelCached ? "Generate ideas" : "Download and generate ideas"}
     </button>
     {running && <button className="text-button" type="button" onClick={cancel}>Cancel</button>}
@@ -161,5 +182,17 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, focus, onFoc
         <span><strong>{skill.elementName}</strong>{trait && <small> · Personality trait to reflect on: {trait.name}, {trait.result.rawScore} / {trait.result.count * 5}</small>}</span>
         <button type="button" className="text-button" aria-pressed={focus === skill.elementName} onClick={() => onFocus(skill.elementName)}>{focus === skill.elementName ? "Chosen" : "Choose priority"}</button>
       </li>)}</ul>}
+    {(modelCached || confirmRemoval) && <details className="optional-exploration">
+      <summary>Manage local AI model</summary>
+      <p className="hint">Remove the model from this browser to free storage. You can download it again later.</p>
+      {confirmRemoval ? <div className="notice">
+        <strong>Remove the local AI model?</strong>
+        <div className="actions">
+          <button type="button" className="danger" disabled={removing || running || modelDownload.status === "downloading"} onClick={removeModel}>{removing ? "Removing…" : "Remove model"}</button>
+          <button type="button" className="text-button" disabled={removing} onClick={() => setConfirmRemoval(false)}>Cancel</button>
+        </div>
+      </div> : <button type="button" className="text-button" disabled={running || modelDownload.status === "downloading"} onClick={() => setConfirmRemoval(true)}>Remove local model</button>}
+    </details>}
+    {removalError && <p role="alert">{removalError}</p>}
   </section>;
 }

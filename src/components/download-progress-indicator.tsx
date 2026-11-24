@@ -9,23 +9,27 @@ export function DownloadProgressIndicator({ onOpenModal }: { onOpenModal?: () =>
   const [wasCancelled, setWasCancelled] = useState(false);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = modelManager.onProgress((update) => {
+      if (timer) clearTimeout(timer);
       setProgress(update);
-      setShouldShow(true);
+      setShouldShow(update.status !== "not-started");
       setIsCancelling(false);
 
       // Hide after completion after 2 seconds
       if (update.status === "completed") {
-        const timer = setTimeout(() => {
+        timer = setTimeout(() => {
           setShouldShow(false);
           setProgress({ status: "not-started", progress: 0 });
           setWasCancelled(false);
         }, 2000);
-        return () => clearTimeout(timer);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
 
   if (!shouldShow) {

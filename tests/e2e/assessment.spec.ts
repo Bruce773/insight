@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("local-model-download-preference", "declined"));
+});
+
 // Synthetic UI test data, not assessment source material.
 function testForm(mode: "quick" | "full") {
   const count = mode === "quick" ? 20 : 120;
@@ -121,6 +125,81 @@ test("local ideas are opt-in, resolve catalog and score references, and clear af
   await expect(page.getByText("Your chosen priority: Synthetic skill")).not.toBeVisible();
   await expect(page.getByText(/Personality trait to reflect on: Synthetic domain/)).not.toBeVisible();
   expect(catalogRequests).toBe(1);
+});
+
+test("the local model can be removed and downloaded again across tabs", async ({ page, context }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "gpu", { value: { requestAdapter: async () => ({}) }, configurable: true });
+    Object.defineProperty(window, "Worker", { value: class {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+      async postMessage() {
+        const base = "https://huggingface.co/mlc-ai/Qwen3.5-4B-q4f32_1-MLC/resolve/main/";
+        const cache = await caches.open("webllm/model");
+        await cache.put(`${base}tensor-cache.json`, new Response(JSON.stringify({ records: [{ dataPath: "params.bin" }] })));
+        await cache.put(`${base}params.bin`, new Response("synthetic model data"));
+        this.onmessage?.(new MessageEvent("message", { data: { type: "model-ready", text: "" } }));
+        this.onmessage?.(new MessageEvent("message", { data: {
+          type: "result", text: JSON.stringify({ ideas: [{ skillId: "2.A.1.a", traitId: "" }] }),
+        } }));
+      }
+      terminate() {}
+    } });
+  });
+  await context.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await context.route("**/api/assessment/catalog?type=skill-list", (route) =>
+    route.fulfill({ json: { items: [{ elementId: "2.A.1.a", elementName: "Synthetic skill" }] } }));
+  await page.goto("/");
+  await page.evaluate(async () => {
+    localStorage.setItem("local-model-download-preference", "declined");
+    const base = "https://huggingface.co/mlc-ai/Qwen3.5-4B-q4f32_1-MLC/resolve/main/";
+    const cache = await caches.open("webllm/model");
+    await cache.put(`${base}tensor-cache.json`, new Response(JSON.stringify({ records: [{ dataPath: "params.bin" }] })));
+    await cache.put(`${base}params.bin`, new Response("synthetic model data"));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await expect(page.getByRole("button", { name: "Generate ideas", exact: true })).toBeVisible();
+  const second = await context.newPage();
+  await second.goto("/");
+  await second.getByRole("button", { name: "Your plan" }).click();
+  await expect(second.getByRole("button", { name: "Generate ideas", exact: true })).toBeVisible();
+
+  await page.getByText("Manage local AI model").click();
+  await page.getByRole("button", { name: "Remove local model" }).click();
+  await page.evaluate(() => {
+    const original = Cache.prototype.delete;
+    let fail = true;
+    Cache.prototype.delete = function (...args) {
+      if (fail) {
+        fail = false;
+        return Promise.reject(new Error("Storage unavailable"));
+      }
+      return original.apply(this, args);
+    };
+  });
+  await page.getByRole("button", { name: "Remove model", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Storage unavailable" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove model", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Remove model", exact: true }).click();
+  await expect(page.getByText("Manage local AI model")).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Download and generate ideas" })).toBeVisible();
+  await expect(second.getByRole("button", { name: "Download and generate ideas" })).toBeVisible();
+  expect(await page.evaluate(async () => {
+    const cache = await caches.open("webllm/model");
+    return !!await cache.match("https://huggingface.co/mlc-ai/Qwen3.5-4B-q4f32_1-MLC/resolve/main/params.bin");
+  })).toBe(false);
+
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await page.getByLabel("Your aspiration").fill("Explore new projects");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await page.getByRole("button", { name: "Download and generate ideas" }).click();
+  await expect(page.getByText("Synthetic skill", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Generate ideas", exact: true })).toBeVisible();
+  await expect(second.getByRole("button", { name: "Generate ideas", exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await expect(page.getByRole("button", { name: "Generate ideas", exact: true })).toBeVisible();
 });
 
 test("local ideas explain when WebGPU is unavailable without downloading", async ({ page }) => {

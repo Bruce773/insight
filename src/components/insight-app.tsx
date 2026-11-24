@@ -113,7 +113,9 @@ export function InsightApp() {
       }
     };
 
-    checkAndShowModal();
+    checkAndShowModal().catch((error) => {
+      console.error("Could not check the local model:", error);
+    });
   }, []);
 
   useEffect(() => {

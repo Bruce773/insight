@@ -3,7 +3,6 @@
 
 [build]
   command = "pnpm build"
-  functions = "netlify/functions"
   publish = ".next"
 
 [build.environment]
@@ -13,11 +12,7 @@
 
 # Functions configuration
 [functions]
-  # Increased timeout for data operations (default is 26s)
   node_bundler = "esbuild"
-  
-  # Memory per function instance (3008 MB = 3GB, allows for concurrent requests)
-  memory = 3008
 
 # Redirect /api/* to serverless functions
 [[redirects]]

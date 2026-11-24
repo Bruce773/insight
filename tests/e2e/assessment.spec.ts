@@ -64,9 +64,13 @@ test("an unavailable assessment still lets a guest make a plan", async ({ page }
   await expect(page.getByLabel("Skills you already have")).toBeVisible();
   await page.getByLabel("Skills you already have").fill("Organizing events");
   await page.getByRole("button", { name: /see my plan/i }).click();
-  await expect(page.getByText("Explore a new direction")).toBeVisible();
-  await expect(page.getByText("1–3 years")).toBeVisible();
-  await expect(page.getByText("Organizing events")).toBeVisible();
+  await expect(page.locator("details").filter({ hasText: "Your aspiration and timeline" })).not.toHaveAttribute("open", "");
+  await expect(page.locator("details").filter({ hasText: "Your skills and reflections" })).not.toHaveAttribute("open", "");
+  await page.getByText("Your aspiration and timeline").click();
+  await page.getByText("Your skills and reflections").click();
+  await expect(page.getByRole("paragraph").filter({ hasText: "Explore a new direction" })).toBeVisible();
+  await expect(page.getByRole("paragraph").filter({ hasText: "1–3 years" })).toBeVisible();
+  await expect(page.getByRole("paragraph").filter({ hasText: "Organizing events" })).toBeVisible();
   await expect(page.getByText("Your aspiration, your skills, and ideas for what to explore next.")).toBeVisible();
   await expect(page.getByText(/O\*NET/i)).not.toBeVisible();
   await expect(page.getByRole("link", { name: /how it works/i })).toHaveAttribute("href", "/about#local-ai");
@@ -109,12 +113,15 @@ test("local ideas are opt-in, resolve catalog and score references, and clear af
   await page.goto("/");
   await page.getByRole("button", { name: "Your plan" }).click();
   await page.getByRole("button", { name: /open plan/i }).click();
+  await page.getByRole("button", { name: "Generate starter roadmap" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Choose an exact duration" })).toBeVisible();
   expect(catalogRequests).toBe(0);
   await page.getByRole("button", { name: /download and generate ideas/i }).click();
   await expect(page.getByRole("status").filter({ hasText: "Preparing the model… 42%" })).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event("test-model-complete")));
   await expect(page.getByText(/Personality trait to reflect on: Synthetic domain/)).toContainText("12 / 20");
   await page.getByRole("button", { name: "Choose priority" }).click();
+  await page.getByText("Your skills and reflections").click();
   await expect(page.getByText("Your chosen priority: Synthetic skill")).toBeVisible();
   await page.getByRole("button", { name: "Save my plan" }).click();
   await expect(page.getByText("Plan saved to your account.")).toBeVisible();
@@ -271,18 +278,18 @@ test("quick assessment scores answers and saves them with a signed-in plan", asy
   }
   await expect(page.getByText("Question 20 of 20", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: /see assessment results/i }).click();
-  await expect(page.getByRole("heading", { name: "Your personality traits" })).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "Test domain 1" })).toContainText("16 / 20");
+  await expect(page.getByRole("heading", { name: "Your personality profile" })).toBeVisible();
   await page.getByRole("button", { name: /continue to aspirations/i }).click();
   await page.getByRole("button", { name: /continue to skills/i }).click();
   await page.getByRole("button", { name: /see my plan/i }).click();
-  await expect(page.getByRole("heading", { name: "Your personality traits" })).toBeVisible();
+  await page.locator("summary").filter({ hasText: "Your personality profile" }).click();
+  await expect(page.getByRole("heading", { name: "Your personality profile" })).toBeVisible();
   await page.getByRole("button", { name: /save my plan/i }).click();
   await expect(page.getByText("Plan saved to your account.")).toBeVisible();
   await expect(page.getByRole("button", { name: /open plan/i })).toBeVisible();
   await page.getByRole("button", { name: /open plan/i }).click();
-  await expect(page.getByRole("listitem").filter({ hasText: "Test domain 1" })).toContainText("16 / 20");
-  expect(saved).toMatchObject({ assessment: { instrument: "Mini-IPIP", responses: { "test-1": 5 } } });
+  await expect(page.getByRole("heading", { name: "Your personality profile" })).toBeVisible();
+  expect(saved).toMatchObject({ assessment: { instrument: "Mini-IPIP", responses: { "test-1": 5 }, domains: { "Test domain 1": { rawScore: 16 } } } });
 });
 
 test("full assessment produces domain and facet scores", async ({ page }) => {
@@ -295,10 +302,12 @@ test("full assessment produces domain and facet scores", async ({ page }) => {
     await page.getByText("Very accurate", { exact: true }).click();
   }
   await page.getByRole("button", { name: /see assessment results/i }).click();
-  await expect(page.getByRole("heading", { name: "Your personality traits" })).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "Test domain 1" })).toContainText("116 / 120");
-  await page.getByText("View more personality traits").click();
-  await expect(page.getByRole("listitem").filter({ has: page.getByText("Test facet 1", { exact: true }) })).toContainText("16 / 20");
+  await expect(page.getByRole("heading", { name: "Your personality profile" })).toBeVisible();
+  await expect(page.locator('.step-content[data-visible="true"]').getByText("Test facet 1", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("insight-guest-plan") ?? "{}").assessment)).toMatchObject({
+    domains: { "Test domain 1": { rawScore: 116 } },
+    facets: { "Test facet 1": { rawScore: 16 } },
+  });
 });
 
 test("experimental comparison is opt-in and a chosen skill can be saved", async ({ page }) => {
@@ -348,6 +357,7 @@ test("experimental comparison is opt-in and a chosen skill can be saved", async 
   await expect(page.getByText(/Source: Synthetic test data/)).not.toBeVisible();
   await page.getByLabel(/skill you want to focus on/i).selectOption("test-skill");
   await page.getByRole("button", { name: /see my plan/i }).click();
+  await page.getByText("Your skills and reflections").click();
   await expect(page.getByText("Your chosen focus: Synthetic skill")).toBeVisible();
   await page.getByRole("button", { name: /save my plan/i }).click();
   await expect(page.getByText("Plan saved to your account.")).toBeVisible();
@@ -393,4 +403,112 @@ test("about explains purpose and sources without interrupting guest progress", a
   await expect(about.getByRole("heading", { name: "Local AI ideas and privacy" })).toBeVisible();
   await about.close();
   await expect(page.getByLabel("Your aspiration")).toHaveValue("Explore a new direction");
+});
+
+test("guest roadmap survives reload and can be saved after same-browser sign-in", async ({ page }) => {
+  let signedIn = false;
+  let saved: unknown;
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: signedIn ? { user: { id: "test-user" } } : {} }));
+  await page.route("**/api/assessment/results", (route) => {
+    if (route.request().method() === "POST") {
+      saved = route.request().postDataJSON();
+      return route.fulfill({ status: 201, json: { id: "saved" } });
+    }
+    return route.fulfill({ json: { items: [] } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: /skip to my plan/i }).click();
+  await page.getByLabel("Your aspiration").fill("Synthetic aspiration");
+  await page.getByLabel("Exact roadmap duration").fill("6");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await page.getByLabel("Add a skill of your own").fill("Synthetic skill");
+  await page.getByRole("button", { name: "Add skill" }).click();
+  await page.getByLabel("Add your own step").fill("Synthetic action");
+  await page.getByLabel("When (months)").fill("3");
+  await page.getByRole("button", { name: "Add step", exact: true }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await expect(page.getByText("#1 Synthetic skill")).toBeVisible();
+  await expect(page.getByLabel("Action")).toHaveValue("Synthetic action");
+
+  signedIn = true;
+  await page.reload();
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await page.getByRole("button", { name: "Open guest draft" }).click();
+  await expect(page.getByLabel("Action")).toHaveValue("Synthetic action");
+  await page.getByRole("button", { name: "Save my plan" }).click();
+  await expect(page.getByText("Plan saved to your account.")).toBeVisible();
+  expect(saved).toMatchObject({ duration: { amount: 6, unit: "months" }, roadmap: {
+    skills: [{ name: "Synthetic skill" }], steps: [{ text: "Synthetic action", at: 3 }],
+  } });
+  expect(await page.evaluate(() => localStorage.getItem("insight-guest-plan"))).toBeNull();
+});
+
+test("roadmap suggestions are selective and accepted work survives input changes", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "gpu", { value: { requestAdapter: async () => ({}) }, configurable: true });
+    Object.defineProperty(window, "Worker", { value: class {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+      postMessage(request: { type: string }) {
+        const result = request.type === "roadmap"
+          ? { steps: [{ text: "Synthetic first action", at: 1 }, { text: "Synthetic second action", at: 3 }] }
+          : { ideas: [{ skillId: "2.A.1.a", traitId: "" }, { skillId: "2.B.1.a", traitId: "" }] };
+        setTimeout(() => this.onmessage?.(new MessageEvent("message", { data: { type: "result", text: JSON.stringify(result) } })), 0);
+      }
+      terminate() {}
+    } });
+  });
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.route("**/api/assessment/catalog?type=skill-list", (route) => route.fulfill({ json: { items: [
+    { elementId: "2.A.1.a", elementName: "Synthetic skill A" },
+    { elementId: "2.B.1.a", elementName: "Synthetic skill B" },
+  ] } }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await page.getByLabel("Your aspiration").fill("Synthetic aspiration");
+  await page.getByLabel("Exact roadmap duration").fill("6");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await page.getByRole("button", { name: /download and generate ideas/i }).click();
+  await page.getByRole("button", { name: "Choose priority" }).first().click();
+  await page.getByRole("button", { name: "Choose priority" }).click();
+  await page.getByRole("button", { name: "Move Synthetic skill B up" }).click();
+  await expect(page.getByText("#1 Synthetic skill B")).toBeVisible();
+  await page.getByRole("button", { name: "Generate starter roadmap" }).click();
+  const first = page.locator(".roadmap-item").filter({ hasText: "Synthetic first action" });
+  await first.getByRole("button", { name: "Add step" }).click();
+  await expect(page.getByLabel("Action")).toHaveValue("Synthetic first action");
+  await expect(page.getByText("Synthetic second action")).toBeVisible();
+  await page.getByLabel("Action").fill("Edited action");
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await page.getByLabel("Your aspiration").fill("Changed aspiration");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await expect(page.getByLabel("Action")).toHaveValue("Edited action");
+  await expect(page.getByText("Review after changes").first()).toBeVisible();
+  await expect(page.getByText("Synthetic second action")).not.toBeVisible();
+  await page.getByRole("button", { name: "Suggest more roadmap steps" }).click();
+  await expect(page.getByLabel("Action")).toHaveValue("Edited action");
+  await expect(page.getByText("Synthetic second action")).toBeVisible();
+  await page.locator(".roadmap-item").filter({ hasText: "Synthetic second action" }).getByRole("button", { name: "Add step" }).click();
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await page.getByLabel("Exact roadmap duration").fill("2");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await expect(page.getByLabel("Action").first()).toHaveValue("Edited action");
+  await expect(page.getByText("This step is outside your timeline. Adjust its timing.")).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("an unreadable browser draft is not silently overwritten and can be deleted", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("insight-guest-plan", "invalid draft"));
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.goto("/");
+  await expect(page.getByRole("status").filter({ hasText: "automatic draft storage is paused" })).toBeVisible();
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await page.getByLabel("Your aspiration").fill("Unsaved work");
+  expect(await page.evaluate(() => localStorage.getItem("insight-guest-plan"))).toBe("invalid draft");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete browser draft" }).click();
+  expect(await page.evaluate(() => localStorage.getItem("insight-guest-plan"))).toBeNull();
+  await expect(page.getByText("The browser draft was deleted.")).toBeVisible();
 });

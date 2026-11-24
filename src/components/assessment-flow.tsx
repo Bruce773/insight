@@ -136,7 +136,7 @@ export function AssessmentFlow({ result, onComplete, onSkip, onContinue, onBack 
           <button className="choice" disabled={loading} onClick={() => start("quick")}><span className="tag">QUICK</span><strong>Quick assessment</strong><span>20 questions</span><span className="arrow">Start →</span></button>
           <button className="choice" disabled={loading} onClick={() => start("full")}><span className="tag">FULL</span><strong>Full assessment</strong><span>120 questions</span><span className="arrow">Start →</span></button>
         </div>
-        <p className="hint">Your answers stay on this page until you sign in and save your plan.</p>
+        <p className="hint">Unfinished answers stay on this page. A completed guest assessment is stored in this browser draft; sign in and save to keep it in your account.</p>
         {loading && <p className="hint" role="status">Loading assessment…</p>}
         <div className="actions"><button className="primary" disabled={loading} onClick={onSkip}>Continue without assessment →</button><button className="text-button" disabled={loading} onClick={onBack}>Back</button></div>
       </>}

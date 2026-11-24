@@ -68,6 +68,10 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
   }
 
   async function generate(mode: "ideas" | "roadmap") {
+    const roadmapContext: Roadmap = {
+      skills: roadmap.skills,
+      steps: roadmap.steps.map(({ id, text, at, source }) => ({ id, text, at, source })),
+    };
     if (!aspiration.trim()) {
       setError("Add an aspiration before generating ideas.");
       return;
@@ -80,7 +84,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
       setError("Choose an exact duration on the Aspirations step before generating a roadmap.");
       return;
     }
-    if (mode === "roadmap" && JSON.stringify(roadmap).length > 12000) {
+    if (mode === "roadmap" && JSON.stringify(roadmapContext).length > 12000) {
       setError("Your roadmap is too long for local generation. You can continue editing it manually or remove some items before requesting suggestions.");
       return;
     }
@@ -158,7 +162,7 @@ export function LocalIdeas({ aspiration, currentSkills, assessment, occupation, 
         setError("The local model worker failed to start or stopped unexpectedly. Check browser support and try again.");
       };
       instance.postMessage(mode === "roadmap"
-        ? { type: "roadmap", aspiration, currentSkills, occupation, traits, duration, roadmap }
+        ? { type: "roadmap", aspiration, currentSkills, occupation, traits, duration, roadmap: roadmapContext }
         : { type: "ideas", aspiration, currentSkills, skills, traits });
     } catch (error) {
       if (id !== request.current) return;

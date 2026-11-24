@@ -426,20 +426,23 @@ test("guest roadmap survives reload and can be saved after same-browser sign-in"
   await page.getByLabel("Add your own step").fill("Synthetic action");
   await page.getByLabel("When (months)").fill("3");
   await page.getByRole("button", { name: "Add step", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Synthetic action" }).click();
+  await page.getByLabel("Notes").fill("Synthetic reminder");
+  await page.getByRole("button", { name: "Save changes" }).click();
   await page.reload();
   await page.getByRole("button", { name: "Your plan" }).click();
   await expect(page.getByText("#1 Synthetic skill")).toBeVisible();
-  await expect(page.getByLabel("Action")).toHaveValue("Synthetic action");
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Synthetic action");
 
   signedIn = true;
   await page.reload();
   await page.getByRole("button", { name: "Your plan" }).click();
   await page.getByRole("button", { name: "Open guest draft" }).click();
-  await expect(page.getByLabel("Action")).toHaveValue("Synthetic action");
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Synthetic action");
   await page.getByRole("button", { name: "Save my plan" }).click();
   await expect(page.getByText("Plan saved to your account.")).toBeVisible();
   expect(saved).toMatchObject({ duration: { amount: 6, unit: "months" }, roadmap: {
-    skills: [{ name: "Synthetic skill" }], steps: [{ text: "Synthetic action", at: 3 }],
+    skills: [{ name: "Synthetic skill" }], steps: [{ text: "Synthetic action", at: 3, notes: "Synthetic reminder" }],
   } });
   expect(await page.evaluate(() => localStorage.getItem("insight-guest-plan"))).toBeNull();
 });
@@ -477,26 +480,153 @@ test("roadmap suggestions are selective and accepted work survives input changes
   await page.getByRole("button", { name: "Generate starter roadmap" }).click();
   const first = page.locator(".roadmap-item").filter({ hasText: "Synthetic first action" });
   await first.getByRole("button", { name: "Add step" }).click();
-  await expect(page.getByLabel("Action")).toHaveValue("Synthetic first action");
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Synthetic first action");
   await expect(page.getByText("Synthetic second action")).toBeVisible();
-  await page.getByLabel("Action").fill("Edited action");
+  await page.getByRole("button", { name: "Edit Synthetic first action" }).click();
+  await page.getByLabel("Step title").fill("Edited action");
+  await page.getByRole("button", { name: "Save changes" }).click();
   await page.getByRole("button", { name: "Aspirations" }).click();
   await page.getByLabel("Your aspiration").fill("Changed aspiration");
   await page.getByRole("button", { name: "Your plan" }).click();
-  await expect(page.getByLabel("Action")).toHaveValue("Edited action");
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Edited action");
   await expect(page.getByText("Review after changes").first()).toBeVisible();
   await expect(page.getByText("Synthetic second action")).not.toBeVisible();
   await page.getByRole("button", { name: "Suggest more roadmap steps" }).click();
-  await expect(page.getByLabel("Action")).toHaveValue("Edited action");
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Edited action");
   await expect(page.getByText("Synthetic second action")).toBeVisible();
   await page.locator(".roadmap-item").filter({ hasText: "Synthetic second action" }).getByRole("button", { name: "Add step" }).click();
   await page.getByRole("button", { name: "Aspirations" }).click();
   await page.getByLabel("Exact roadmap duration").fill("2");
   await page.getByRole("button", { name: "Your plan" }).click();
-  await expect(page.getByLabel("Action").first()).toHaveValue("Edited action");
+  await expect(page.locator(".roadmap-step-toggle").first()).toContainText("Edited action");
+  await page.locator(".roadmap-step-toggle").last().click();
   await expect(page.getByText("This step is outside your timeline. Adjust its timing.")).toBeVisible();
   await page.setViewportSize({ width: 375, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("step cards edit, expand, reorder, and retain notes after reload", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await page.getByLabel("Exact roadmap duration").fill("6");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  for (const title of ["First step", "Second step", "Third step"]) {
+    await page.getByLabel("Add your own step").fill(title);
+    await page.getByRole("button", { name: "Add step", exact: true }).click();
+  }
+  const cards = page.locator(".roadmap-step");
+  const titles = page.locator(".roadmap-step-toggle strong");
+  await expect(titles).toHaveText(["First step", "Second step", "Third step"]);
+  await expect(cards.first().locator(".roadmap-step-toggle")).toHaveAttribute("aria-expanded", "false");
+  expect((await cards.first().boundingBox())?.height).toBeLessThan(80);
+  await cards.first().locator(".roadmap-step-toggle").click();
+  await expect(cards.first().getByText("No notes yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Edit First step" }).click();
+  await expect(page.getByLabel("Step title")).toBeFocused();
+  await page.getByLabel("Step title").fill("Discarded edit");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(titles.first()).toHaveText("First step");
+  await page.getByRole("button", { name: "Edit First step" }).click();
+  await page.getByLabel("Step title").fill("Updated step");
+  await page.getByLabel("When (months)").first().fill("4");
+  await page.getByLabel("Notes").fill("First line\nSecond line");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(titles.first()).toHaveText("Updated step");
+  await expect(cards.first()).toContainText("First line");
+  await expect(cards.first()).toContainText("months 4");
+  await cards.first().locator(".roadmap-step-toggle").click();
+
+  await cards.last().scrollIntoViewIfNeeded();
+  const source = await cards.first().locator(".roadmap-drag-handle").boundingBox();
+  const target = await cards.last().boundingBox();
+  if (!source || !target) throw new Error("Roadmap cards are not visible.");
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(5, source.y + source.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await expect(titles).toHaveText(["Updated step", "Second step", "Third step"]);
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height - 8, { steps: 12 });
+  await page.mouse.up();
+  await expect(titles).toHaveText(["Second step", "Third step", "Updated step"]);
+  await cards.last().locator(".roadmap-step-toggle").click();
+  await cards.last().getByRole("button", { name: "Move step 3 up" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(titles).toHaveText(["Second step", "Updated step", "Third step"]);
+  await expect(page.getByText("Updated step moved to position 2 of 3.")).toBeAttached();
+  await page.reload();
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await expect(titles).toHaveText(["Second step", "Updated step", "Third step"]);
+  await cards.nth(1).locator(".roadmap-step-toggle").click();
+  await expect(cards.nth(1)).toContainText("First line");
+  await expect(cards.nth(1)).toContainText("Second line");
+  await expect(cards.nth(1)).toContainText("months 4");
+});
+
+test.describe("touch roadmap controls", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("dragging a step handle reorders cards on touch devices", async ({ page, context }) => {
+    await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Your plan" }).click();
+    for (const title of ["First touch step", "Second touch step", "Third touch step"]) {
+      await page.getByLabel("Add your own step").fill(title);
+      await page.getByRole("button", { name: "Add step", exact: true }).click();
+    }
+    const cards = page.locator(".roadmap-step");
+    const titles = page.locator(".roadmap-step-toggle strong");
+    await cards.last().scrollIntoViewIfNeeded();
+    const source = await cards.last().locator(".roadmap-drag-handle").boundingBox();
+    const target = await cards.first().boundingBox();
+    if (!source || !target) throw new Error("Roadmap cards are not visible.");
+    const from = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+    const to = { x: target.x + target.width / 2, y: target.y + 8 };
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [from] });
+    for (let index = 1; index <= 8; index++) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{
+        x: from.x + (to.x - from.x) * index / 8,
+        y: from.y + (to.y - from.y) * index / 8,
+      }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(titles).toHaveText(["Third touch step", "First touch step", "Second touch step"]);
+    await cdp.detach();
+  });
+});
+
+test("step notes do not prevent local roadmap suggestions", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("insight-guest-plan", JSON.stringify({
+      version: 1, aspiration: "Synthetic aspiration", horizon: "", occupation: null, ratings: {}, action: "",
+      duration: { amount: 6, unit: "months" }, roadmap: {
+        skills: [], steps: Array.from({ length: 4 }, (_, index) => ({
+          id: `step-${index}`, text: `Synthetic step ${index + 1}`, at: 1, source: "user", notes: "Synthetic notes ".repeat(250),
+        })),
+      },
+    }));
+    Object.defineProperty(navigator, "gpu", { value: { requestAdapter: async () => ({}) }, configurable: true });
+    Object.defineProperty(window, "Worker", { value: class {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+      postMessage(request: unknown) {
+        document.documentElement.dataset.notesSentToWorker = String(JSON.stringify(request).includes("Synthetic notes"));
+        setTimeout(() => this.onmessage?.(new MessageEvent("message", { data: {
+          type: "result", text: JSON.stringify({ steps: [{ text: "Synthetic suggestion", at: 2 }] }),
+        } })), 0);
+      }
+      terminate() {}
+    } });
+  });
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await page.getByRole("button", { name: "Suggest more roadmap steps" }).click();
+  await expect(page.getByText("Synthetic suggestion")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-notes-sent-to-worker", "false");
 });
 
 test("an unreadable browser draft is not silently overwritten and can be deleted", async ({ page }) => {

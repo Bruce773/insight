@@ -116,3 +116,19 @@ export function XCircleIcon({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+export function GripIcon({ className = "" }: { className?: string }) {
+  return <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <circle cx="9" cy="5" r="1.5" /><circle cx="15" cy="5" r="1.5" />
+    <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+    <circle cx="9" cy="19" r="1.5" /><circle cx="15" cy="19" r="1.5" />
+  </svg>;
+}
+
+export function ChevronIcon({ className = "" }: { className?: string }) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
+}
+
+export function EditIcon({ className = "" }: { className?: string }) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>;
+}

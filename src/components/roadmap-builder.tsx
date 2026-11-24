@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { RoadmapStepCard } from "@/components/roadmap-step-card";
 import type { Duration, Roadmap, RoadmapSkill, RoadmapStep } from "@/lib/engine/roadmap";
 
 export function RoadmapBuilder({ duration, roadmap, onChange }: {
@@ -11,6 +12,15 @@ export function RoadmapBuilder({ duration, roadmap, onChange }: {
   const [skillName, setSkillName] = useState("");
   const [stepText, setStepText] = useState("");
   const [stepAt, setStepAt] = useState(1);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
+  const [moveMessage, setMoveMessage] = useState("");
+  const drag = useRef<{ pointerId: number; id: string; x: number; y: number; currentX: number; currentY: number; moved: boolean; target: { id: string; position: "before" | "after" } | null } | null>(null);
+  const scrollFrame = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+  }, []);
 
   function move<T>(items: T[], index: number, direction: -1 | 1): T[] {
     const next = [...items];
@@ -26,6 +36,70 @@ export function RoadmapBuilder({ duration, roadmap, onChange }: {
 
   function updateSkill(id: string, update: Partial<RoadmapSkill>) {
     onChange({ ...roadmap, skills: roadmap.skills.map((skill) => skill.id === id ? { ...skill, ...update } : skill) });
+  }
+
+  function startDrag(event: PointerEvent<HTMLSpanElement>, id: string) {
+    if (!event.isPrimary || event.button !== 0 || drag.current) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { pointerId: event.pointerId, id, x: event.clientX, y: event.clientY, currentX: event.clientX, currentY: event.clientY, moved: false, target: null };
+  }
+
+  function updateDragTarget() {
+    const active = drag.current;
+    if (!active) return;
+    const element = document.elementFromPoint(active.currentX, active.currentY)?.closest<HTMLElement>("[data-roadmap-step-id]");
+    const id = element?.dataset.roadmapStepId;
+    const bounds = element?.getBoundingClientRect();
+    const target = element && id && id !== active.id
+      ? { id, position: bounds && active.currentY < bounds.top + bounds.height / 2 ? "before" as const : "after" as const }
+      : null;
+    active.target = target;
+    setDropTarget((current) => current?.id === target?.id && current?.position === target?.position ? current : target);
+  }
+
+  function moveDrag(event: PointerEvent<HTMLSpanElement>) {
+    const active = drag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    active.currentX = event.clientX;
+    active.currentY = event.clientY;
+    if (!active.moved && Math.hypot(event.clientX - active.x, event.clientY - active.y) < 6) return;
+    if (!active.moved) {
+      active.moved = true;
+      setDraggingId(active.id);
+      const scroll = () => {
+        const current = drag.current;
+        if (!current?.moved) return;
+        if (current.currentY < 120) window.scrollBy(0, -12);
+        else if (current.currentY > window.innerHeight - 80) window.scrollBy(0, 12);
+        updateDragTarget();
+        scrollFrame.current = requestAnimationFrame(scroll);
+      };
+      scrollFrame.current = requestAnimationFrame(scroll);
+    }
+    updateDragTarget();
+  }
+
+  function endDrag(event: PointerEvent<HTMLSpanElement>, cancelled: boolean) {
+    const active = drag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    drag.current = null;
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+    scrollFrame.current = null;
+    setDraggingId(null);
+    setDropTarget(null);
+    if (cancelled || !active.moved || !active.target) return;
+    const from = roadmap.steps.findIndex((step) => step.id === active.id);
+    const steps = [...roadmap.steps];
+    if (from < 0) return;
+    const [item] = steps.splice(from, 1);
+    const targetIndex = steps.findIndex((step) => step.id === active.target?.id);
+    if (targetIndex < 0) return;
+    const destination = targetIndex + (active.target.position === "after" ? 1 : 0);
+    steps.splice(destination, 0, item);
+    if (destination === from) return;
+    onChange({ ...roadmap, steps });
+    setMoveMessage(`${item.text.trim() || "Step"} moved to position ${destination + 1} of ${steps.length}.`);
   }
 
   return <section aria-labelledby="roadmap-heading">
@@ -59,22 +133,17 @@ export function RoadmapBuilder({ duration, roadmap, onChange }: {
     </form>
 
     <h3>Your steps</h3>
-    <p className="hint">{duration ? `Place steps within your ${duration.amount}-${duration.unit} timeline. You can change them at any time.` : "Add steps now and choose their timing after setting a duration."}</p>
-    {roadmap.steps.length > 0 ? <ol className="roadmap-list">{roadmap.steps.map((step, index) => <li className="roadmap-step" key={step.id}>
-      <div className="roadmap-step-header"><strong>Step {index + 1}</strong>{step.review && <span className="roadmap-review">Review after changes</span>}</div>
-      <label htmlFor={`step-${step.id}`}>Action</label>
-      <textarea id={`step-${step.id}`} maxLength={500} value={step.text} onChange={(event) => updateStep(step.id, { text: event.target.value })} />
-      {duration && <><label htmlFor={`step-time-${step.id}`}>When ({duration.unit})</label><input id={`step-time-${step.id}`} className="roadmap-time" type="number" min="1" max={duration.amount} value={step.at} onChange={(event) => {
-        const at = Number(event.target.value);
-        if (Number.isInteger(at) && at >= 1 && at <= 1000) updateStep(step.id, { at });
-      }} />{step.at > duration.amount && <p role="status" className="roadmap-review">This step is outside your timeline. Adjust its timing.</p>}</>}
-      <div className="roadmap-controls">
-        <button type="button" className="text-button" disabled={index === 0} onClick={() => onChange({ ...roadmap, steps: move(roadmap.steps, index, -1) })} aria-label={`Move step ${index + 1} up`}>Move up</button>
-        <button type="button" className="text-button" disabled={index === roadmap.steps.length - 1} onClick={() => onChange({ ...roadmap, steps: move(roadmap.steps, index, 1) })} aria-label={`Move step ${index + 1} down`}>Move down</button>
-        {step.review && <button type="button" className="text-button" onClick={() => updateStep(step.id, { review: false })}>Reviewed</button>}
-        <button type="button" className="text-button" onClick={() => onChange({ ...roadmap, steps: roadmap.steps.filter((item) => item.id !== step.id) })} aria-label={`Remove step ${index + 1}`}>Remove</button>
-      </div>
-    </li>)}</ol> : <p className="hint">Your roadmap is empty. Add a step or request local AI suggestions below.</p>}
+    <p className="hint">{duration ? `Place steps within your ${duration.amount}-${duration.unit} timeline.` : "Add steps now and choose their timing after setting a duration."} Drag a handle to reorder, or open a step to use the move buttons.</p>
+    <p className="sr-only" aria-live="polite">{moveMessage}</p>
+    {roadmap.steps.length > 0 ? <ol className="roadmap-list">{roadmap.steps.map((step, index) => <RoadmapStepCard key={step.id} step={step} index={index} count={roadmap.steps.length} duration={duration}
+      dragging={draggingId === step.id} dropPosition={dropTarget?.id === step.id ? dropTarget.position : undefined}
+      onPointerDown={startDrag} onPointerMove={moveDrag} onPointerEnd={endDrag}
+      onUpdate={(update) => updateStep(step.id, update)}
+      onMove={(direction) => {
+        onChange({ ...roadmap, steps: move(roadmap.steps, index, direction) });
+        setMoveMessage(`${step.text.trim() || "Step"} moved to position ${index + direction + 1} of ${roadmap.steps.length}.`);
+      }}
+      onRemove={() => onChange({ ...roadmap, steps: roadmap.steps.filter((item) => item.id !== step.id) })} />)}</ol> : <p className="hint">Your roadmap is empty. Add a step or request local AI suggestions below.</p>}
     <form className="roadmap-add" onSubmit={(event) => {
       event.preventDefault();
       const text = stepText.trim();

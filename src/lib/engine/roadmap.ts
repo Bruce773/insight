@@ -1,7 +1,7 @@
 export type DurationUnit = "weeks" | "months" | "years";
 export type Duration = { amount: number; unit: DurationUnit };
 export type RoadmapSkill = { id: string; name: string; source: "user" | "ai"; review?: boolean };
-export type RoadmapStep = { id: string; text: string; at: number; source: "user" | "ai"; review?: boolean };
+export type RoadmapStep = { id: string; text: string; at: number; notes?: string; source: "user" | "ai"; review?: boolean };
 export type Roadmap = { skills: RoadmapSkill[]; steps: RoadmapStep[] };
 export type StepSuggestion = { text: string; at: number };
 
@@ -27,6 +27,7 @@ export function isRoadmap(value: unknown): value is Roadmap {
   };
   return value.skills.every((item: unknown) => validItem(item) && typeof item.name === "string" && item.name.length <= 200 && !!item.name.trim()) &&
     value.steps.every((item: unknown) => validItem(item) && typeof item.text === "string" && item.text.length <= 500 &&
+      (item.notes === undefined || typeof item.notes === "string" && item.notes.length <= 4000) &&
       typeof item.at === "number" && Number.isInteger(item.at) && item.at >= 1 && item.at <= 1000);
 }
 

@@ -113,6 +113,27 @@ footer { border-top: 1px solid rgba(220, 229, 218, 0.3); padding: 25px max(6vw, 
 .roadmap-input-row input:not(.roadmap-time) { flex: 1 1 200px; }
 .roadmap-time { width: 120px; }
 .roadmap-add .actions { margin: 16px 0; }
+.roadmap-step { position: relative; padding: 0; }
+.roadmap-step[data-dragging="true"] { opacity: .5; }
+.roadmap-step[data-drop-position]::after { content: ""; position: absolute; left: 8px; right: 8px; height: 3px; border-radius: 3px; background: #67965d; pointer-events: none; }
+.roadmap-step[data-drop-position="before"]::after { top: -7px; }
+.roadmap-step[data-drop-position="after"]::after { bottom: -7px; }
+.roadmap-step-summary { display: flex; align-items: center; gap: 4px; padding: 4px 10px 4px 4px; }
+.roadmap-drag-handle { display: grid; place-items: center; flex: 0 0 40px; min-height: 48px; color: #789080; cursor: grab; touch-action: none; user-select: none; }
+.roadmap-drag-handle:active { cursor: grabbing; }
+.roadmap-drag-handle svg, .roadmap-icon-button svg, .roadmap-chevron { width: 20px; height: 20px; }
+.roadmap-step-toggle { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 2px; border: 0; background: transparent; color: var(--ink); text-align: left; }
+.roadmap-step-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; min-width: 0; overflow-wrap: anywhere; }
+.roadmap-step-number { color: #6a8a62; font-size: 10px; font-weight: 800; letter-spacing: .1em; white-space: nowrap; }
+.roadmap-chevron { flex: 0 0 20px; transition: transform .2s ease; }
+.roadmap-chevron.expanded { transform: rotate(180deg); }
+.roadmap-icon-button { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); }
+.roadmap-icon-button:hover, .roadmap-step-toggle:hover { color: #67965d; }
+.roadmap-step-details, .roadmap-step-edit { padding: 4px 20px 20px; }
+.roadmap-step-edit { padding-top: 20px; }
+.roadmap-step-details p { margin: 8px 0; }
+.roadmap-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.roadmap-step-edit .actions { margin-bottom: 0; }
 
 /* Transition effects */
 .transition-container { position: relative; }

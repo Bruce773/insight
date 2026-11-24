@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const session = await deps.auth();
     if (!session?.user?.id) return Response.json({ error: "Sign in to save your plan." }, { status: 401 });
     const body = await request.text();
-    if (body.length > 100_000) return Response.json({ error: "Plan is too large." }, { status: 413 });
+    if (body.length > 600_000) return Response.json({ error: "Plan is too large." }, { status: 413 });
     let payload: unknown;
     try { payload = JSON.parse(body); } catch { return Response.json({ error: "Invalid plan." }, { status: 400 }); }
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {

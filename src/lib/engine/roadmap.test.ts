@@ -16,6 +16,9 @@ describe("roadmap validation", () => {
 
   it("validates saved roadmap shape and preserves edits when marking for review", () => {
     expect(isRoadmap(roadmap)).toBe(true);
+    expect(isRoadmap({ ...roadmap, steps: [{ ...roadmap.steps[0], notes: "Example notes" }] })).toBe(true);
+    expect(isRoadmap({ ...roadmap, steps: [{ ...roadmap.steps[0], notes: 42 }] })).toBe(false);
+    expect(isRoadmap({ ...roadmap, steps: [{ ...roadmap.steps[0], notes: "x".repeat(4001) }] })).toBe(false);
     expect(isRoadmap({ ...roadmap, steps: [{ ...roadmap.steps[0], id: "skill" }] })).toBe(false);
     expect(isRoadmap({ ...roadmap, steps: [{ ...roadmap.steps[0], at: -1 }] })).toBe(false);
     expect(markRoadmapForReview(roadmap)).toEqual({

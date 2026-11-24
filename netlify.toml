@@ -1,5 +1,5 @@
-# InSight Netlify Configuration with Neon Database Integration
-# This configuration automatically sets up the app for production deployment
+# InSight Netlify Configuration
+# Production deployment with Neon database
 
 [build]
   command = "pnpm build"
@@ -8,14 +8,7 @@
 [build.environment]
   NODE_VERSION = "22"
   NETLIFY_NEXT_SKEW_PROTECTION = "true"
-  # Build-time only. Runtime secrets go in Netlify UI: Functions scope
   ENVIRONMENT = "production"
-
-# Neon Postgres Integration
-# Automatically provisioned via Netlify's Neon integration
-# After connecting, Netlify sets DATABASE_URL automatically
-[[integrations]]
-  package = "@netlify/neon"
 
 # Functions configuration
 [functions]

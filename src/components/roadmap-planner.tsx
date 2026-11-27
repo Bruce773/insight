@@ -36,37 +36,40 @@ export function RoadmapPlanner({
   onBack: () => void;
 }) {
   const [mode, setMode] = useState<RoadmapPlannerMode | "final" | null>(null);
+  const [visitedGeneration, setVisitedGeneration] = useState(false);
+
+  function selectMode(next: RoadmapPlannerMode) {
+    if (next === "generate") setVisitedGeneration(true);
+    setMode(next);
+  }
 
   if (!mode) {
     return (
       <RoadmapPlannerStep1
-        onSelectMode={setMode}
+        onSelectMode={selectMode}
         onBack={onBack}
       />
     );
   }
 
-  if (mode === "generate") {
-    return (
-      <RoadmapPlannerStep2
-        key={JSON.stringify([duration, assessment, aspiration, currentSkills, occupation])}
-        duration={duration}
-        roadmap={roadmap}
-        assessment={assessment}
-        aspiration={aspiration}
-        currentSkills={currentSkills}
-        occupation={occupation}
-        onChange={onChange}
-        onSetDuration={onSetDuration}
-        onBack={() => setMode(null)}
-        onContinue={() => setMode("manual")}
-      />
-    );
-  }
-
-  if (mode === "manual") {
-    return (
-      <RoadmapPlannerStep3
+  return (
+    <>
+      {visitedGeneration && <div hidden={mode !== "generate"}>
+        <RoadmapPlannerStep2
+          key={JSON.stringify([duration, assessment, aspiration, currentSkills, occupation])}
+          duration={duration}
+          roadmap={roadmap}
+          assessment={assessment}
+          aspiration={aspiration}
+          currentSkills={currentSkills}
+          occupation={occupation}
+          onChange={onChange}
+          onSetDuration={onSetDuration}
+          onBack={() => setMode(null)}
+          onContinue={() => setMode("manual")}
+        />
+      </div>}
+      {mode === "manual" && <RoadmapPlannerStep3
         duration={duration}
         roadmap={roadmap}
         aspiration={aspiration}
@@ -77,17 +80,14 @@ export function RoadmapPlanner({
         onChange={onChange}
         onSetDuration={onSetDuration}
         onBack={() => setMode(null)}
-        onGenerate={() => setMode("generate")}
+        onGenerate={() => selectMode("generate")}
         onViewFinal={() => setMode("final")}
-      />
-    );
-  }
-
-  return (
-    <RoadmapPlannerStep4
-      roadmap={roadmap}
-      duration={duration}
-      onBack={() => setMode("manual")}
-    />
+      />}
+      {mode === "final" && <RoadmapPlannerStep4
+        roadmap={roadmap}
+        duration={duration}
+        onBack={() => setMode("manual")}
+      />}
+    </>
   );
 }

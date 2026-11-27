@@ -656,8 +656,8 @@ test("roadmap suggestions are selective and accepted work survives input changes
   await page.getByRole("button", { name: "Add 1 step to my roadmap →" }).click();
   await expect(page.locator(".roadmap-step-toggle")).toContainText("Synthetic first action");
   await page.getByRole("button", { name: "Generate more steps" }).click();
-  await page.getByRole("button", { name: /Download & generate|Generate steps from my profile/ }).click();
   await expect(page.getByText("Synthetic first action", { exact: true })).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Select Synthetic second action" })).toBeVisible();
   await page.getByRole("button", { name: "Select Synthetic second action" }).click();
   await page.getByRole("button", { name: "Add 1 step to my roadmap →" }).click();
   await page.getByRole("button", { name: "Edit Synthetic first action" }).click();
@@ -678,6 +678,45 @@ test("roadmap suggestions are selective and accepted work survives input changes
   await expect(page.getByText("This step is outside your timeline. Adjust its timing.")).toBeVisible();
   await page.setViewportSize({ width: 375, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("changing the roadmap during generation rejects stale suggestions", async ({ page }) => {
+  const plan = {
+    version: 1, aspiration: "Synthetic aspiration", horizon: "", occupation: null, ratings: {}, action: "",
+    duration: { amount: 6, unit: "months" },
+  };
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "gpu", { value: { requestAdapter: async () => ({}) }, configurable: true });
+    Object.defineProperty(window, "Worker", { value: class {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+      postMessage() {
+        window.addEventListener("test-roadmap-complete", () => this.onmessage?.(new MessageEvent("message", {
+          data: { type: "result", text: JSON.stringify({ steps: [{ text: "Stale action", at: 1 }] }) },
+        })), { once: true });
+        document.documentElement.dataset.workerStarted = "true";
+      }
+      terminate() {}
+    } });
+  });
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: { user: { id: "test-user" } } }));
+  await page.route("**/api/assessment/results", (route) => route.fulfill({ json: { items: [
+    { id: "first", createdAt: "2026-01-01", payload: { ...plan, roadmap: { skills: [], steps: [] } } },
+    { id: "second", createdAt: "2026-01-02", payload: { ...plan, roadmap: {
+      skills: [], steps: [{ id: "existing", text: "Saved action", at: 1, source: "user" }],
+    } } },
+  ] } }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await page.getByText("Saved plans and account").click();
+  await page.getByRole("button", { name: /open plan/i }).first().click();
+  await page.getByRole("button", { name: /Generate My Plan/i }).click();
+  await page.getByRole("button", { name: /Download & generate|Generate steps from my profile/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-worker-started", "true");
+  await page.getByRole("button", { name: /open plan/i }).nth(1).click();
+  await page.evaluate(() => window.dispatchEvent(new Event("test-roadmap-complete")));
+  await expect(page.getByRole("alert").filter({ hasText: "roadmap changed during generation" })).toBeVisible();
+  await expect(page.getByText("Stale action")).not.toBeVisible();
 });
 
 test("step cards edit, expand, reorder, and retain notes after reload", async ({ page }) => {
@@ -800,6 +839,13 @@ test("the new planner works end to end on a narrow phone, including export and s
   await page.getByRole("button", { name: "Continue to final roadmap →" }).click();
   await expect(page.getByRole("heading", { name: "Your roadmap is ready" })).toBeVisible();
   await expect(page.locator(".roadmap-final-view")).toContainText("Explore 100% remote options");
+  const finalStep = page.locator(".roadmap-final-step details");
+  await expect(finalStep).not.toHaveAttribute("open", "");
+  await finalStep.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(finalStep).toHaveAttribute("open", "");
+  await expect(finalStep.getByText(/A note with 50%/)).toBeVisible();
+  await finalStep.locator("summary").click();
   await noOverflow();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download as JSON" }).click();
@@ -815,6 +861,8 @@ test("the new planner works end to end on a narrow phone, including export and s
   await page.getByRole("button", { name: "Print / save as PDF" }).click();
   const printWindow = await popupPromise;
   await expect(printWindow.locator("body")).toContainText("Explore 100% remote options");
+  await expect(printWindow.getByText(/A note with 50%/)).toBeVisible();
+  await expect(printWindow.locator(".final-step-chevron, .hint")).toHaveCount(0);
   await printWindow.close();
   await page.getByRole("button", { name: "Generate share link" }).click();
   const link = await page.getByLabel("Roadmap share link").inputValue();
@@ -822,6 +870,9 @@ test("the new planner works end to end on a narrow phone, including export and s
   await page.goto(link);
   await expect(page.getByRole("heading", { name: "Shared Roadmap" })).toBeVisible();
   await expect(page.getByText("Explore 100% remote options")).toBeVisible();
+  expect((await page.locator(".final-step-title").boundingBox())?.width).toBeGreaterThanOrEqual(120);
+  await expect(page.getByText(/A note with 50%/)).not.toBeVisible();
+  await page.locator(".roadmap-final-step summary").click();
   await expect(page.getByText(/A note with 50%/)).toBeVisible();
   await noOverflow();
 });

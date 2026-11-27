@@ -32,6 +32,7 @@ export function RoadmapPlannerStep2({
   onContinue: () => void;
 }) {
   const [suggestions, setSuggestions] = useState<StepSuggestion[]>([]);
+  const [suggestionPriorities, setSuggestionPriorities] = useState("");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -42,6 +43,18 @@ export function RoadmapPlannerStep2({
   const [confirmRemoval, setConfirmRemoval] = useState(false);
   const request = useRef(0);
   const worker = useRef<Worker | null>(null);
+  const roadmapRef = useRef(roadmap);
+  const priorities = JSON.stringify(roadmap.skills.map(({ id, name }) => ({ id, name })));
+  const normalize = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  const existingTexts = new Set(roadmap.steps.map((step) => normalize(step.text)));
+  const availableSuggestions = suggestionPriorities === priorities
+    ? suggestions.map((suggestion, index) => ({ suggestion, index })).filter(({ suggestion }) => !existingTexts.has(normalize(suggestion.text)))
+    : [];
+  const selectedSuggestions = availableSuggestions.filter(({ index }) => acceptedSteps.has(index));
+
+  useEffect(() => {
+    roadmapRef.current = roadmap;
+  }, [roadmap]);
 
   useEffect(() => {
     const requestCounter = request;
@@ -96,6 +109,7 @@ export function RoadmapPlannerStep2({
     }
 
     const id = ++request.current;
+    const snapshot = JSON.stringify(roadmap);
     setGenerating(true);
     setError("");
     setSuggestions([]);
@@ -111,7 +125,7 @@ export function RoadmapPlannerStep2({
 
       if (id !== request.current) return;
 
-      const existingStepTexts = new Set(roadmap.steps.map((s) => s.text.toLocaleLowerCase().replace(/\s+/g, " ").trim()));
+      const existingStepTexts = new Set(roadmap.steps.map((s) => normalize(s.text)));
       const traits = ideaTraits(assessment);
       const roadmapContext = {
         skills: roadmap.skills,
@@ -146,23 +160,28 @@ export function RoadmapPlannerStep2({
           if (event.data.type !== "result") {
             throw new Error("The local model returned an unexpected response.");
           }
+          if (JSON.stringify(roadmapRef.current) !== snapshot) {
+            throw new Error("Your roadmap changed during generation. Please request new suggestions.");
+          }
 
           const parsed = parseStepSuggestions(event.data.text, duration);
 
           const filtered = parsed.filter((step) => {
-            const text = step.text.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+            const text = normalize(step.text);
             if (existingStepTexts.has(text)) return false;
             existingStepTexts.add(text);
             return true;
           });
 
           setSuggestions(filtered);
+          setSuggestionPriorities(priorities);
           setMessage("");
           if (filtered.length === 0) {
             setMessage("No new steps were generated. You can manually add steps or continue editing.");
           }
         } catch (error) {
           setError(error instanceof Error ? error.message : "Could not parse generated steps. Try again or build manually.");
+          setMessage("");
           setSuggestions([]);
         } finally {
           instance.terminate();
@@ -211,7 +230,7 @@ export function RoadmapPlannerStep2({
   }
 
   function acceptAll() {
-    setAcceptedSteps(new Set(suggestions.map((_, i) => i)));
+    setAcceptedSteps(new Set(availableSuggestions.map(({ index }) => index)));
   }
 
   function rejectAll() {
@@ -219,16 +238,11 @@ export function RoadmapPlannerStep2({
   }
 
   function addAcceptedSteps() {
-    if (roadmap.steps.length + acceptedSteps.size > 100) {
+    if (roadmap.steps.length + selectedSuggestions.length > 100) {
       setError("A roadmap can contain at most 100 steps. Select fewer suggestions.");
       return;
     }
-    const newSteps = suggestions
-      .map((suggestion, index) => ({
-        suggestion,
-        index,
-      }))
-      .filter(({ index }) => acceptedSteps.has(index))
+    const newSteps = selectedSuggestions
       .map(({ suggestion }) => ({
         id: crypto.randomUUID(),
         text: suggestion.text,
@@ -247,6 +261,8 @@ export function RoadmapPlannerStep2({
       steps: [...roadmap.steps, ...newSteps],
     });
 
+    setSuggestions(suggestions.filter((_, index) => !acceptedSteps.has(index)));
+    setAcceptedSteps(new Set());
     onContinue();
   }
 
@@ -296,7 +312,7 @@ export function RoadmapPlannerStep2({
 
         <p className="hint">Your entries stay on your device. Local AI requires WebGPU and about 4.7 GB of GPU memory. First use downloads about 2.4 GB from external model hosts. Suggestions are unvalidated; review them before adding. <a href="/about#local-ai" target="_blank" rel="noopener noreferrer">How it works (opens in a new tab)</a></p>
         {!duration && <p className="hint">Set an exact duration to generate timed steps. <button type="button" className="text-button" onClick={onSetDuration}>Set your timeline →</button></p>}
-        {!generating && suggestions.length === 0 ? (
+        {!generating && availableSuggestions.length === 0 ? (
           <div className="roadmap-generation-controls">
             {modelDownload.status === "downloading" && (
               <div className="model-download-status">
@@ -339,7 +355,7 @@ export function RoadmapPlannerStep2({
           </div>
         )}
 
-        {suggestions.length > 0 && (
+        {availableSuggestions.length > 0 && (
           <div className="roadmap-suggestions">
             <h2>Suggested steps</h2>
             <p className="suggestions-hint">
@@ -348,7 +364,7 @@ export function RoadmapPlannerStep2({
 
             <div className="suggestions-actions">
               <button type="button" className="text-button" onClick={acceptAll}>
-                Select all ({suggestions.length})
+                Select all ({availableSuggestions.length})
               </button>
               <button type="button" className="text-button" onClick={rejectAll}>
                 Clear selection
@@ -356,7 +372,7 @@ export function RoadmapPlannerStep2({
             </div>
 
             <div className="suggestions-list">
-              {suggestions.map((suggestion, index) => (
+              {availableSuggestions.map(({ suggestion, index }) => (
                 <div key={index} className="suggestion-card">
                   <button
                     type="button"
@@ -384,9 +400,9 @@ export function RoadmapPlannerStep2({
                 type="button"
                 className="primary"
                 onClick={addAcceptedSteps}
-                disabled={acceptedSteps.size === 0}
+                disabled={selectedSuggestions.length === 0}
               >
-                Add {acceptedSteps.size} step{acceptedSteps.size !== 1 ? "s" : ""} to my roadmap →
+                Add {selectedSuggestions.length} step{selectedSuggestions.length !== 1 ? "s" : ""} to my roadmap →
               </button>
               <button type="button" className="text-button" onClick={() => setSuggestions([])}>
                 Generate different steps
@@ -410,7 +426,7 @@ export function RoadmapPlannerStep2({
           </div> : <button type="button" className="text-button" disabled={generating || removingModel} onClick={() => setConfirmRemoval(true)}>Remove local model</button>}
         </details>}
         <div className="actions">
-          <button type="button" className="text-button" onClick={onContinue}>Continue manually</button>
+          <button type="button" className="text-button" onClick={() => { if (generating) cancel(); onContinue(); }}>Continue manually</button>
           <button type="button" className="text-button" onClick={onBack}>
             Back
           </button>

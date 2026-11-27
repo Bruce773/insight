@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Duration, Roadmap } from "@/lib/engine/roadmap";
 import { DownloadIcon, LinkIcon, CopyIcon } from "@/components/icon";
-import "./roadmap-planner-step4.css";
+import { RoadmapPreview } from "@/components/roadmap-preview";
 
 export function RoadmapPlannerStep4({
   roadmap,
@@ -52,22 +52,28 @@ export function RoadmapPlannerStep4({
   }
 
   function downloadPDF() {
-    const element = document.querySelector(".roadmap-final-view");
+    const element = document.querySelector<HTMLElement>(".roadmap-final-view");
     if (!element) {
       setError("Could not prepare the roadmap for printing.");
       return;
     }
 
-    // For now, we'll use a simple approach
-    // In production, use a library like html2pdf or pdfkit
+    const printable = element.cloneNode(true);
+    if (!(printable instanceof HTMLElement)) {
+      setError("Could not prepare the roadmap for printing.");
+      return;
+    }
+    printable.querySelectorAll("details").forEach((details) => { details.open = true; });
+    printable.querySelectorAll(".final-step-chevron, .hint").forEach((element) => element.remove());
+
     const printWindow = window.open("", "", "height=400,width=800");
     if (!printWindow) {
       setError("Could not open the print window. Allow pop-ups and try again.");
       return;
     }
 
-    printWindow.document.write("<html><head><title>My Roadmap</title></head><body>");
-    printWindow.document.write(element.innerHTML);
+    printWindow.document.write("<html><head><title>My Roadmap</title><style>.final-step-header { display: flex; gap: 0.75em; } .roadmap-final-step { break-inside: avoid; }</style></head><body>");
+    printWindow.document.write(printable.innerHTML);
     printWindow.document.write("</body></html>");
     printWindow.document.close();
     printWindow.print();
@@ -100,48 +106,7 @@ export function RoadmapPlannerStep4({
           Here&apos;s your personalized plan. You can export it, share it, or come back to edit it anytime.
         </p>
 
-        <div className="roadmap-final-view">
-          <div className="roadmap-final-header">
-            <h2>Your Step-by-Step Plan</h2>
-            {duration && (
-              <div className="duration-info">
-                <strong>Timeline:</strong> {duration.amount} {duration.unit}
-              </div>
-            )}
-          </div>
-
-          <ol className="roadmap-final-steps">
-            {roadmap.steps.map((step, index) => (
-              <li key={step.id} className="roadmap-final-step">
-                <div className="final-step-header">
-                  <span className="step-number">Step {index + 1}</span>
-                  <h3>{step.text}</h3>
-                </div>
-                {duration && (
-                  <p className="step-timeline">
-                    <strong>When:</strong> {duration.unit} {step.at}
-                  </p>
-                )}
-                {step.notes && (
-                  <p className="step-notes">
-                    <strong>Notes:</strong> {step.notes}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
-
-          {roadmap.skills.length > 0 && (
-            <div className="roadmap-final-skills">
-              <h3>Skills to focus on</h3>
-              <ul className="skills-list">
-                {roadmap.skills.map((skill) => (
-                  <li key={skill.id}>{skill.name}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        <RoadmapPreview roadmap={roadmap} duration={duration} />
 
         <div className="roadmap-export-section">
           <h2>Share & export your roadmap</h2>

@@ -145,7 +145,8 @@ export function SparklesIcon({ className = "" }: { className?: string }) {
       className={className}
       aria-hidden="true"
     >
-      <path d="M15 3h6v6M9 15l6 6M3 3h6v6m6 0h6v6" />
+      <path d="M10 3c.6 3.9 2.1 5.4 6 6-3.9.6-5.4 2.1-6 6-.6-3.9-2.1-5.4-6-6 3.9-.6 5.4-2.1 6-6Z" />
+      <path d="M18 14c.3 2 1 2.7 3 3-2 .3-2.7 1-3 3-.3-2-1-2.7-3-3 2-.3 2.7-1 3-3Z" />
     </svg>
   );
 }
@@ -162,9 +163,8 @@ export function PencilIcon({ className = "" }: { className?: string }) {
       className={className}
       aria-hidden="true"
     >
-      <line x1="12" y1="20" x2="12" y2="10" />
-      <line x1="8" y1="14" x2="16" y2="14" />
-      <path d="M6 8l2-2m8 0l2-2M4 4l3 3m8 0l3-3" />
+      <path d="M4 20l.9-4.3L16.3 4.3a2.4 2.4 0 0 1 3.4 3.4L8.3 19.1 4 20Z" />
+      <path d="m14.5 6.1 3.4 3.4M4.9 15.7l3.4 3.4" />
     </svg>
   );
 }

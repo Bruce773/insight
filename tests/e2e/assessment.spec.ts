@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("local-model-download-preference", "declined"));
@@ -18,6 +18,11 @@ function testForm(mode: "quick" | "full") {
       reverseKeyed: index === 0,
     })),
   };
+}
+
+async function openTimeline(page: Page) {
+  const timeline = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: "Add a timeline" }) });
+  if (await timeline.getAttribute("open") === null) await timeline.locator("summary").click();
 }
 
 test("imported skills include essential and transferable skills but not knowledge", async ({ request }) => {
@@ -59,6 +64,7 @@ test("an unavailable assessment still lets a guest make a plan", async ({ page }
   await expect(page.getByLabel("Occupation or code")).not.toBeVisible();
   await page.waitForTimeout(350);
   expect(occupationRequests).toBe(0);
+  await openTimeline(page);
   await page.getByLabel("Your time horizon").selectOption({ label: "1–3 years" });
   await page.getByRole("button", { name: /continue to skills/i }).click();
   await expect(page.getByLabel("Skills you already have")).toBeVisible();
@@ -74,6 +80,80 @@ test("an unavailable assessment still lets a guest make a plan", async ({ page }
   await expect(page.getByText("Your aspiration, your skills, and ideas for what to explore next.")).toBeVisible();
   await expect(page.getByText(/O\*NET/i)).not.toBeVisible();
   await expect(page.getByRole("link", { name: /how it works/i })).toHaveAttribute("href", "/about#local-ai");
+});
+
+test("aspiration ideas can be combined, edited, and restored without losing existing text", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  const aspiration = page.getByLabel("Your aspiration");
+  await aspiration.fill("My own goal");
+  await page.getByRole("button", { name: "Education & learning" }).click();
+  await page.getByRole("button", { name: "+ Learn a new skill" }).click();
+  await page.getByRole("button", { name: "Hobbies & interests" }).click();
+  await page.getByRole("button", { name: "+ Make time for a hobby" }).click();
+  await expect(aspiration).toHaveValue("My own goal\nLearn a new skill\nMake time for a hobby");
+  await aspiration.fill("My own goal\nLearn photography");
+  await page.getByRole("button", { name: "Continue to skills →" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await expect(aspiration).toHaveValue("My own goal\nLearn photography");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await page.getByText("Your aspiration and timeline").click();
+  await expect(page.getByRole("paragraph").filter({ hasText: "My own goal Learn photography" })).toBeVisible();
+});
+
+test("aspiration ideas do not overwrite text at the length limit and are optional", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  await page.getByRole("button", { name: "Skip this for now →" }).click();
+  await expect(page.getByLabel("Skills you already have")).toBeVisible();
+  await page.getByRole("button", { name: "Aspirations" }).click();
+  const aspiration = page.getByLabel("Your aspiration");
+  const existing = "x".repeat(4000);
+  await aspiration.fill(existing);
+  await page.getByRole("button", { name: "Career", exact: true }).click();
+  await page.getByRole("button", { name: "+ Explore a new career direction" }).click();
+  await expect(aspiration).toHaveValue(existing);
+  await expect(page.getByRole("status").filter({ hasText: "There isn't room" })).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("main flows and sign-in stay usable on narrow screens", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/");
+  for (const step of ["Welcome", "Assessment", "Aspirations", "Skills", "Your plan"]) {
+    await page.locator(".progress").getByRole("button", { name: step }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  }
+  await page.getByRole("button", { name: "Set your timeline →" }).click();
+  await expect(page.getByLabel("Exact roadmap duration")).toBeVisible();
+  await page.getByLabel("Exact roadmap duration").fill("3");
+  await page.getByRole("button", { name: "Career", exact: true }).click();
+  const idea = page.getByRole("button", { name: "+ Explore a new career direction" });
+  await expect(idea).toBeVisible();
+  const ideaBox = await idea.boundingBox();
+  expect(ideaBox?.height).toBeGreaterThanOrEqual(44);
+  await idea.click();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+  const progress = page.locator(".progress");
+  await expect.poll(async () => (await progress.boundingBox())?.y).toBe(0);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  const modal = page.locator(".auth-modal");
+  await expect(modal).toBeVisible();
+  await expect.poll(async () => {
+    const box = await modal.boundingBox();
+    return box ? Math.abs(box.x - (320 - box.width) / 2) : Infinity;
+  }).toBeLessThan(1);
+  await expect(page.getByLabel("Email address")).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.goto("/about");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await expect(page.getByRole("link", { name: "Back to InSight" }).first()).toBeVisible();
 });
 
 test("the plan and generation lead the page while supporting details stay accessible", async ({ page }) => {
@@ -122,6 +202,7 @@ test("either kind of local generation can be cancelled", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Aspirations" }).click();
   await page.getByLabel("Your aspiration").fill("Synthetic aspiration");
+  await openTimeline(page);
   await page.getByLabel("Exact roadmap duration").fill("6");
   await page.getByRole("button", { name: "Your plan" }).click();
 
@@ -482,6 +563,7 @@ test("guest roadmap survives reload and can be saved after same-browser sign-in"
   await page.goto("/");
   await page.getByRole("button", { name: /skip to my plan/i }).click();
   await page.getByLabel("Your aspiration").fill("Synthetic aspiration");
+  await openTimeline(page);
   await page.getByLabel("Exact roadmap duration").fill("6");
   await page.getByRole("button", { name: "Your plan" }).click();
   await page.getByText("Skills to prioritize").click();
@@ -536,6 +618,7 @@ test("roadmap suggestions are selective and accepted work survives input changes
   await page.goto("/");
   await page.getByRole("button", { name: "Aspirations" }).click();
   await page.getByLabel("Your aspiration").fill("Synthetic aspiration");
+  await openTimeline(page);
   await page.getByLabel("Exact roadmap duration").fill("6");
   await page.getByRole("button", { name: "Your plan" }).click();
   await page.getByRole("button", { name: /download and generate skill ideas/i }).click();
@@ -553,7 +636,8 @@ test("roadmap suggestions are selective and accepted work survives input changes
   await page.getByLabel("Step title").fill("Edited action");
   await page.getByRole("button", { name: "Save changes" }).click();
   await page.getByRole("button", { name: "Aspirations" }).click();
-  await page.getByLabel("Your aspiration").fill("Changed aspiration");
+  await page.getByRole("button", { name: "Career", exact: true }).click();
+  await page.getByRole("button", { name: "+ Explore a new career direction" }).click();
   await page.getByRole("button", { name: "Your plan" }).click();
   await expect(page.locator(".roadmap-step-toggle")).toContainText("Edited action");
   await expect(page.locator(".roadmap-step-toggle").first()).toContainText("Needs review");
@@ -563,6 +647,7 @@ test("roadmap suggestions are selective and accepted work survives input changes
   await expect(page.getByText("Synthetic second action")).toBeVisible();
   await page.locator(".roadmap-item").filter({ hasText: "Synthetic second action" }).getByRole("button", { name: "Add step" }).click();
   await page.getByRole("button", { name: "Aspirations" }).click();
+  await openTimeline(page);
   await page.getByLabel("Exact roadmap duration").fill("2");
   await page.getByRole("button", { name: "Your plan" }).click();
   await expect(page.locator(".roadmap-step-toggle").first()).toContainText("Edited action");
@@ -576,6 +661,7 @@ test("step cards edit, expand, reorder, and retain notes after reload", async ({
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
   await page.goto("/");
   await page.getByRole("button", { name: "Aspirations" }).click();
+  await openTimeline(page);
   await page.getByLabel("Exact roadmap duration").fill("6");
   await page.getByRole("button", { name: "Your plan" }).click();
   await page.getByText("Add a step manually").click();

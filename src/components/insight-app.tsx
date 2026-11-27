@@ -46,6 +46,15 @@ const steps: { id: Step; label: string }[] = [
   { id: "skills", label: "Skills" },
   { id: "results", label: "Your plan" },
 ];
+const aspirationCategories = [
+  { name: "Career", ideas: ["Explore a new career direction", "Grow in my current work", "Find work that fits my life"] },
+  { name: "Education & learning", ideas: ["Learn a new skill", "Earn a qualification", "Explore a subject that interests me"] },
+  { name: "Hobbies & interests", ideas: ["Make time for a hobby", "Try a creative activity", "Explore a new interest"] },
+  { name: "Health & well-being", ideas: ["Build healthier routines", "Make more time for rest", "Support my mental well-being"] },
+  { name: "Money", ideas: ["Save more money", "Build a budget", "Work toward financial stability"] },
+  { name: "Relationships", ideas: ["Spend more time with people I care about", "Build new connections", "Strengthen my relationships"] },
+  { name: "Personal growth", ideas: ["Build confidence", "Find more balance in my life", "Explore what matters to me"] },
+] as const;
 
 async function getJson(url: string) {
   const response = await fetch(url);
@@ -80,6 +89,9 @@ function isWorkStyleRow(value: unknown): value is WorkStyleRow {
 export function InsightApp() {
   const [step, setStep] = useState<Step>("welcome");
   const [plan, setPlan] = useState<Plan>(blankPlan);
+  const [aspirationCategory, setAspirationCategory] = useState<string | null>(null);
+  const [aspirationMessage, setAspirationMessage] = useState("");
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [occupationOpen, setOccupationOpen] = useState(false);
   const [occupations, setOccupations] = useState<Occupation[]>([]);
@@ -103,6 +115,17 @@ export function InsightApp() {
   const matchRequest = useRef(0);
   const skills = skillState && plan.occupation && skillState.code === plan.occupation.code ? skillState.items : [];
   const skillMessage = !plan.occupation ? "" : skillState?.code === plan.occupation.code ? skillState.message : "Loading skills…";
+  const selectedCategory = aspirationCategories.find((category) => category.name === aspirationCategory);
+
+  function addAspirationIdea(idea: string) {
+    const next = plan.aspiration ? `${plan.aspiration}${plan.aspiration.endsWith("\n") ? "" : "\n"}${idea}` : idea;
+    if (next.length > 4000) {
+      setAspirationMessage("There isn't room for this idea. Shorten your aspiration before adding it.");
+      return;
+    }
+    setAspirationMessage("Idea added. You can edit it below.");
+    setPlan((current) => ({ ...current, aspiration: next, ideaFocus: undefined, roadmap: markRoadmapForReview(current.roadmap) }));
+  }
 
   useEffect(() => {
     getJson("/api/auth/session").then((data) => {
@@ -333,9 +356,28 @@ export function InsightApp() {
         <section className="content step-content" data-visible={step === "aspirations"} hidden={step !== "aspirations"}>
           <div className="eyebrow">02 / LOOK AHEAD</div>
           <h1>What are you moving toward?</h1>
-          <p className="lead">There&apos;s no right answer. Your aspiration can be specific or still taking shape.</p>
+          <p className="lead">Start with one idea, or skip this for now. You can always change it later.</p>
+          {!plan.aspiration.trim() && <button className="text-button aspiration-skip" type="button" onClick={() => setStep("skills")}>Skip this for now →</button>}
+          <div className="aspiration-guide">
+            <h2>1. Pick an area</h2>
+            <p>Choose an area for ideas, or write your own below.</p>
+            <div className="aspiration-options" aria-label="Aspiration areas">
+              {aspirationCategories.map((category) => <button key={category.name} type="button" aria-pressed={aspirationCategory === category.name} onClick={() => { setAspirationCategory(category.name); setAspirationMessage(""); }}>{category.name}</button>)}
+            </div>
+            {selectedCategory && <div className="aspiration-ideas">
+              <h2>2. Add an idea</h2>
+              <p>Choose any that feel right. Switch areas to add more.</p>
+              <div className="aspiration-options" aria-label={`${selectedCategory.name} ideas`}>
+                {selectedCategory.ideas.map((idea) => <button key={idea} type="button" onClick={() => addAspirationIdea(idea)}>+ {idea}</button>)}
+              </div>
+            </div>}
+            <p className="hint aspiration-feedback" role="status">{aspirationMessage}</p>
+          </div>
           <label htmlFor="aspiration">Your aspiration</label>
-          <textarea id="aspiration" value={plan.aspiration} maxLength={4000} onChange={(e) => setPlan({ ...plan, aspiration: e.target.value, ideaFocus: undefined, roadmap: markRoadmapForReview(plan.roadmap) })} placeholder="What would you like to explore or work toward?" />
+          <p className="hint">Edit your ideas or write something in your own words.</p>
+          <textarea id="aspiration" value={plan.aspiration} maxLength={4000} onChange={(e) => { setAspirationMessage(""); setPlan({ ...plan, aspiration: e.target.value, ideaFocus: undefined, roadmap: markRoadmapForReview(plan.roadmap) }); }} placeholder="What would you like to explore or work toward?" />
+          <details className="optional-exploration" open={timelineOpen} onToggle={(event) => setTimelineOpen(event.currentTarget.open)}>
+          <summary>Add a timeline <span className="optional">optional{plan.horizon || plan.duration ? " · added" : ""}</span></summary>
           <label htmlFor="horizon">Your time horizon</label>
           <select id="horizon" value={plan.horizon} onChange={(e) => setPlan({ ...plan, horizon: e.target.value })}><option value="">Choose one (optional)</option><option>Within 6 months</option><option>6–12 months</option><option>1–3 years</option><option>More than 3 years</option><option>Not sure yet</option></select>
           <label htmlFor="duration">Exact roadmap duration <span className="optional">needed for timed AI suggestions</span></label>
@@ -353,6 +395,7 @@ export function InsightApp() {
             }}><option value="weeks">Weeks</option><option value="months">Months</option><option value="years">Years</option></select>
           </div>
           <p className="hint">Choose a whole number from 1 to 1,000. Your earlier range is kept as a reflection.</p>
+          </details>
           <details className="optional-exploration" open={occupationOpen} onToggle={(event) => setOccupationOpen(event.currentTarget.open)}>
             <summary>Explore a specific occupation <span className="optional">optional{plan.occupation ? ` · ${plan.occupation.title} selected` : ""}</span></summary>
             <p>Choose an occupation to explore its skills, or continue with your aspiration alone.</p>
@@ -402,7 +445,7 @@ export function InsightApp() {
                 const roadmap = current.roadmap ?? emptyRoadmap;
                 return roadmap.steps.length >= 100 ? current : { ...current, roadmap: { ...roadmap, steps: [...roadmap.steps, { ...step, id: crypto.randomUUID(), source: "ai" }] } };
               })} />
-            <RoadmapBuilder duration={plan.duration} roadmap={plan.roadmap ?? emptyRoadmap} onChange={(roadmap) => setPlan((current) => ({ ...current, roadmap }))} onSetDuration={() => setStep("aspirations")} />
+            <RoadmapBuilder duration={plan.duration} roadmap={plan.roadmap ?? emptyRoadmap} onChange={(roadmap) => setPlan((current) => ({ ...current, roadmap }))} onSetDuration={() => { setTimelineOpen(true); setStep("aspirations"); }} />
           </div>
           <div className="actions plan-save-actions">{session === "signed-in" ? <button className="plan-save-button" onClick={savePlan}>Save my plan</button> : <button type="button" className="plan-save-button" onClick={() => setShowAuthModal(true)}>Sign in to save</button>}<button className="text-button" onClick={() => setStep("skills")}>Back to skills</button></div>
           {session !== "signed-in" && <p className="hint plan-draft-hint">Your guest draft is stored in this browser on this device, where other users of the device may see it. Sign in and save to keep it in your account. <button className="text-button" type="button" onClick={() => {

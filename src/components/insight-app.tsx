@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { AssessmentFlow, AssessmentScores, isAssessmentResult } from "@/components/assessment-flow";
-import { LocalIdeas } from "@/components/local-ideas";
-import { RoadmapBuilder } from "@/components/roadmap-builder";
+import { RoadmapPlanner } from "@/components/roadmap-planner";
 import { LocalModelDownloadModal } from "@/components/local-model-download-modal";
 import { DownloadProgressIndicator } from "@/components/download-progress-indicator";
 import { ToastContainer } from "@/components/toast-container";
@@ -430,46 +429,47 @@ export function InsightApp() {
         </section>
 
         <section className="content step-content plan-page" data-visible={step === "results"} hidden={step !== "results"}>
-          <div className="eyebrow">04 / YOUR NEXT CHAPTER</div>
-          <h1>A plan that starts with you.</h1>
-          <p className="lead">Your aspiration, your skills, and ideas for what to explore next.</p>
           {session === "signed-in" && availableDraft && <div className="notice plan-draft-notice"><p>A guest draft is available in this browser. Opening it replaces the plan currently on this page, not your saved plans.</p><button className="text-button" type="button" onClick={() => { loadPlan(availableDraft); setUsingDraft(true); setSaveMessage("Guest draft opened. Save it to your account when ready."); }}>Open guest draft</button>{" · "}<button className="text-button" type="button" onClick={deleteGuestDraft}>Delete browser draft</button></div>}
-          <div className="plan-workspace">
-            <LocalIdeas key={JSON.stringify([plan.aspiration, plan.currentSkills, plan.assessment, plan.duration, plan.occupation])} aspiration={plan.aspiration} currentSkills={plan.currentSkills ?? ""} assessment={plan.assessment} occupation={plan.occupation?.title} focus={plan.ideaFocus} duration={plan.duration} roadmap={plan.roadmap ?? emptyRoadmap} onFocus={(ideaFocus) => setPlan((current) => ({ ...current, ideaFocus }))}
-              onAddSkill={(name) => setPlan((current) => {
-                const roadmap = current.roadmap ?? emptyRoadmap;
-                return roadmap.skills.some((skill) => skill.name === name) || roadmap.skills.length >= 100 ? current :
-                  { ...current, roadmap: { ...roadmap, skills: [...roadmap.skills, { id: crypto.randomUUID(), name, source: "ai" }] } };
-              })}
-              onAddStep={(step) => setPlan((current) => {
-                const roadmap = current.roadmap ?? emptyRoadmap;
-                return roadmap.steps.length >= 100 ? current : { ...current, roadmap: { ...roadmap, steps: [...roadmap.steps, { ...step, id: crypto.randomUUID(), source: "ai" }] } };
-              })} />
-            <RoadmapBuilder duration={plan.duration} roadmap={plan.roadmap ?? emptyRoadmap} onChange={(roadmap) => setPlan((current) => ({ ...current, roadmap }))} onSetDuration={() => { setTimelineOpen(true); setStep("aspirations"); }} />
-          </div>
-          <div className="actions plan-save-actions">{session === "signed-in" ? <button className="plan-save-button" onClick={savePlan}>Save my plan</button> : <button type="button" className="plan-save-button" onClick={() => setShowAuthModal(true)}>Sign in to save</button>}<button className="text-button" onClick={() => setStep("skills")}>Back to skills</button></div>
-          {session !== "signed-in" && <p className="hint plan-draft-hint">Your guest draft is stored in this browser on this device, where other users of the device may see it. Sign in and save to keep it in your account. <button className="text-button" type="button" onClick={() => {
-            if (window.confirm("Delete the browser draft and start over?")) deleteGuestDraft();
-          }}>Delete browser draft</button></p>}
-          {saveMessage && <p role="status">{saveMessage}</p>}
-          <div className="plan-support">
-            <h2>More about you</h2>
-            <details className="plan-support-disclosure"><summary>Your aspiration and timeline</summary>
-              <div className="summary"><div><span>YOUR ASPIRATION</span><p>{plan.aspiration || "You haven’t added an aspiration yet."}</p></div>{plan.horizon && <div><span>TIME HORIZON</span><p>{plan.horizon}</p></div>}{plan.duration && <div><span>ROADMAP DURATION</span><p>{plan.duration.amount} {plan.duration.unit}</p></div>}{plan.occupation && <div><span>OCCUPATION YOU CHOSE</span><p>{plan.occupation.title}</p></div>}</div>
-            </details>
-            <details className="plan-support-disclosure"><summary>Your skills and reflections</summary>
-              <h2>Skills you already have</h2>
-              {plan.currentSkills ? <p className="entered-skills">{plan.currentSkills}</p> : <p>You can add your skills on the previous step.</p>}
-              {skills.some((skill) => plan.ratings[skill.elementId]) && <><h2>Your confidence ratings</h2><ul className="reflection-list">{skills.filter((skill) => plan.ratings[skill.elementId]).map((skill) => <li key={skill.elementId}>{skill.elementName} <strong>{plan.ratings[skill.elementId]} / 5 confidence</strong></li>)}</ul></>}
-              {plan.focusSkill && <p>Your chosen focus: {skills.find((skill) => skill.elementId === plan.focusSkill)?.elementName ?? "Skill details unavailable."}</p>}
-              {plan.ideaFocus && <p>Your chosen priority: {plan.ideaFocus}</p>}
-            </details>
-            {plan.assessment && <details className="plan-support-disclosure"><summary>Your personality profile</summary><AssessmentScores result={plan.assessment} /></details>}
-            <details className="plan-support-disclosure"><summary>One next step you want to take {plan.action && <span className="optional"> · added</span>}</summary>
-              <label htmlFor="action">One next step you want to take</label>
-              <textarea id="action" value={plan.action} maxLength={4000} onChange={(e) => setPlan({ ...plan, action: e.target.value })} placeholder="Write an action that feels useful to you." />
-            </details>
-            {session === "signed-in" && <details className="plan-support-disclosure"><summary>Saved plans and account <span className="optional"> · {saved.length} saved</span></summary>{saved.length ? <ul className="saved-list">{saved.map((entry) => <li key={entry.id}><span>{new Date(entry.createdAt).toLocaleString()}</span><button className="text-button" onClick={() => loadPlan(entry.payload)}>Open plan →</button></li>)}</ul> : <p>No saved plans to show.</p>}<p className="hint">You can <a href="/api/data/export">export your data</a> or delete your account and its data below.</p><DeleteAccount onDeleted={() => { clearMatches(); setSession("guest"); setSaved([]); setPlan(blankPlan); setAssessmentSession((session) => session + 1); setStep("welcome"); }} /></details>}
+
+          <RoadmapPlanner
+            duration={plan.duration}
+            roadmap={plan.roadmap ?? emptyRoadmap}
+            assessment={plan.assessment}
+            aspiration={plan.aspiration}
+            currentSkills={plan.currentSkills ?? ""}
+            occupation={plan.occupation || undefined}
+            ideaFocus={plan.ideaFocus}
+            onFocus={(ideaFocus) => setPlan((current) => ({ ...current, ideaFocus }))}
+            onChange={(roadmap) => setPlan((current) => ({ ...current, roadmap }))}
+            onSetDuration={() => { setTimelineOpen(true); setStep("aspirations"); }}
+            onBack={() => setStep("skills")}
+          />
+
+          <div className="plan-workspace-legacy" style={{marginTop: "40px"}}>
+            <div className="plan-save-actions">{session === "signed-in" ? <button className="plan-save-button" onClick={savePlan}>Save my plan</button> : <button type="button" className="plan-save-button" onClick={() => setShowAuthModal(true)}>Sign in to save</button>}</div>
+            {session !== "signed-in" && <p className="hint plan-draft-hint">Your guest draft is stored in this browser on this device, where other users of the device may see it. Sign in and save to keep it in your account. <button className="text-button" type="button" onClick={() => {
+              if (window.confirm("Delete the browser draft and start over?")) deleteGuestDraft();
+            }}>Delete browser draft</button></p>}
+            {saveMessage && <p role="status">{saveMessage}</p>}
+            <div className="plan-support">
+              <h2>More about you</h2>
+              <details className="plan-support-disclosure"><summary>Your aspiration and timeline</summary>
+                <div className="summary"><div><span>YOUR ASPIRATION</span><p>{plan.aspiration || "You haven't added an aspiration yet."}</p></div>{plan.horizon && <div><span>TIME HORIZON</span><p>{plan.horizon}</p></div>}{plan.duration && <div><span>ROADMAP DURATION</span><p>{plan.duration.amount} {plan.duration.unit}</p></div>}{plan.occupation && <div><span>OCCUPATION YOU CHOSE</span><p>{plan.occupation.title}</p></div>}</div>
+              </details>
+              <details className="plan-support-disclosure"><summary>Your skills and reflections</summary>
+                <h2>Skills you already have</h2>
+                {plan.currentSkills ? <p className="entered-skills">{plan.currentSkills}</p> : <p>You can add your skills on the previous step.</p>}
+                {skills.some((skill) => plan.ratings[skill.elementId]) && <><h2>Your confidence ratings</h2><ul className="reflection-list">{skills.filter((skill) => plan.ratings[skill.elementId]).map((skill) => <li key={skill.elementId}>{skill.elementName} <strong>{plan.ratings[skill.elementId]} / 5 confidence</strong></li>)}</ul></>}
+                {plan.focusSkill && <p>Your chosen focus: {skills.find((skill) => skill.elementId === plan.focusSkill)?.elementName ?? "Skill details unavailable."}</p>}
+                {plan.ideaFocus && <p>Your chosen priority: {plan.ideaFocus}</p>}
+              </details>
+              {plan.assessment && <details className="plan-support-disclosure"><summary>Your personality profile</summary><AssessmentScores result={plan.assessment} /></details>}
+              <details className="plan-support-disclosure"><summary>One next step you want to take {plan.action && <span className="optional"> · added</span>}</summary>
+                <label htmlFor="action">One next step you want to take</label>
+                <textarea id="action" value={plan.action} maxLength={4000} onChange={(e) => setPlan({ ...plan, action: e.target.value })} placeholder="Write an action that feels useful to you." />
+              </details>
+              {session === "signed-in" && <details className="plan-support-disclosure"><summary>Saved plans and account <span className="optional"> · {saved.length} saved</span></summary>{saved.length ? <ul className="saved-list">{saved.map((entry) => <li key={entry.id}><span>{new Date(entry.createdAt).toLocaleString()}</span><button className="text-button" onClick={() => loadPlan(entry.payload)}>Open plan →</button></li>)}</ul> : <p>No saved plans to show.</p>}<p className="hint">You can <a href="/api/data/export">export your data</a> or delete your account and its data below.</p><DeleteAccount onDeleted={() => { clearMatches(); setSession("guest"); setSaved([]); setPlan(blankPlan); setAssessmentSession((session) => session + 1); setStep("welcome"); }} /></details>}
+            </div>
           </div>
         </section>
         </div>

@@ -50,7 +50,7 @@ export function LocalModelDownloadModal({
 
         <div className="modal-content">
           <p className="modal-lead">
-            The final step runs a local AI model directly in your browser for personalized planning and roadmapping unique to you and your assessment results.
+            You can optionally run an AI model in your browser to suggest ideas for your roadmap.
           </p>
 
           <div className="privacy-benefits">
@@ -58,14 +58,14 @@ export function LocalModelDownloadModal({
               <LockIcon className="benefit-icon" />
               <div>
                 <strong>Your data stays private</strong>
-                <p>Nothing leaves your browser</p>
+                <p>Inputs for local generation stay on your device</p>
               </div>
             </div>
             <div className="benefit-item">
               <EyeIcon className="benefit-icon" />
               <div>
-                <strong>We don&apos;t see it</strong>
-                <p>No logs, no tracking</p>
+                <strong>You choose what to share</strong>
+                <p>Saving or sharing a plan sends its contents to the app</p>
               </div>
             </div>
             <div className="benefit-item">
@@ -79,7 +79,7 @@ export function LocalModelDownloadModal({
 
           <div className="recommendation-box">
             <p>
-              Download now (~500 MB, cached in browser). It&apos;ll be ready when you reach the final step.
+              Download now (approximately 2.4 GB, cached in your browser). It requires WebGPU and sufficient device memory.
             </p>
           </div>
 

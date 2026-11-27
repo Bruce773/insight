@@ -1,0 +1,56 @@
+.roadmap-planner-step3 {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.roadmap-planner-step3 .eyebrow {
+  margin-bottom: 8px;
+}
+
+.roadmap-planner-step3 h1 {
+  margin: 0 0 12px;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.roadmap-planner-step3 .lead {
+  font-size: 16px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.roadmap-planner-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.roadmap-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  border: 1px solid rgba(220, 229, 218, 0.5);
+  min-height: 300px;
+}
+
+.roadmap-planner-step3 > .actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .plan-page .roadmap-planner-step3 h1 {
+    font-size: 32px;
+  }
+
+  .roadmap-editor-container {
+    padding: 16px;
+  }
+}

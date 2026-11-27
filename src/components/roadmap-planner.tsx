@@ -1,0 +1,93 @@
+"use client";
+
+import { useState } from "react";
+import type { AssessmentResult } from "@/lib/engine/assessment";
+import type { Duration, Roadmap } from "@/lib/engine/roadmap";
+import { RoadmapPlannerStep1 } from "./roadmap-planner-step1";
+import { RoadmapPlannerStep2 } from "./roadmap-planner-step2";
+import { RoadmapPlannerStep3 } from "./roadmap-planner-step3";
+import { RoadmapPlannerStep4 } from "./roadmap-planner-step4";
+
+export type RoadmapPlannerMode = "generate" | "manual";
+
+export function RoadmapPlanner({
+  duration,
+  roadmap,
+  assessment,
+  aspiration,
+  currentSkills,
+  occupation,
+  ideaFocus,
+  onFocus,
+  onChange,
+  onSetDuration,
+  onBack,
+}: {
+  duration?: Duration;
+  roadmap: Roadmap;
+  assessment?: AssessmentResult;
+  aspiration: string;
+  currentSkills: string;
+  occupation?: { code: string; title: string };
+  ideaFocus?: string;
+  onFocus: (skill: string) => void;
+  onChange: (roadmap: Roadmap) => void;
+  onSetDuration: () => void;
+  onBack: () => void;
+}) {
+  const [mode, setMode] = useState<RoadmapPlannerMode | "final" | null>(null);
+
+  if (!mode) {
+    return (
+      <RoadmapPlannerStep1
+        onSelectMode={setMode}
+        onBack={onBack}
+      />
+    );
+  }
+
+  if (mode === "generate") {
+    return (
+      <RoadmapPlannerStep2
+        key={JSON.stringify([duration, assessment, aspiration, currentSkills, occupation])}
+        duration={duration}
+        roadmap={roadmap}
+        assessment={assessment}
+        aspiration={aspiration}
+        currentSkills={currentSkills}
+        occupation={occupation}
+        onChange={onChange}
+        onSetDuration={onSetDuration}
+        onBack={() => setMode(null)}
+        onContinue={() => setMode("manual")}
+      />
+    );
+  }
+
+  if (mode === "manual") {
+    return (
+      <RoadmapPlannerStep3
+        duration={duration}
+        roadmap={roadmap}
+        aspiration={aspiration}
+        currentSkills={currentSkills}
+        assessment={assessment}
+        focus={ideaFocus}
+        onFocus={onFocus}
+        onChange={onChange}
+        onSetDuration={onSetDuration}
+        onBack={() => setMode(null)}
+        onGenerate={() => setMode("generate")}
+        onViewFinal={() => setMode("final")}
+      />
+    );
+  }
+
+  return (
+    <RoadmapPlannerStep4
+      roadmap={roadmap}
+      duration={duration}
+      onBack={() => setMode("manual")}
+    />
+  );
+}

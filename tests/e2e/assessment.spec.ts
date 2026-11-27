@@ -783,6 +783,56 @@ test("step cards edit, expand, reorder, and retain notes after reload", async ({
   await expect(cards.nth(1)).toContainText("months 4");
 });
 
+test("final roadmap links to timeline and notes editing and preserves changes", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: {} }));
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("insight-guest-plan")) localStorage.setItem("insight-guest-plan", JSON.stringify({
+      version: 1, aspiration: "", horizon: "", occupation: null, ratings: {}, action: "",
+      duration: { amount: 4, unit: "years" },
+      roadmap: { skills: [], steps: [{ id: "one", text: "My step", at: 4, source: "user" }] },
+    }));
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await openEditor(page);
+  await page.getByRole("button", { name: "Continue to final roadmap →" }).click();
+  await expect(page.getByRole("button", { name: "Edit roadmap" })).toBeVisible();
+  await page.locator(".duration-info").hover();
+  await expect(page.getByRole("button", { name: "Edit timeline", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit timeline", exact: true }).click();
+  await page.getByLabel("Timeline length").fill("0");
+  await expect(page.getByRole("button", { name: "Save timeline" })).toBeDisabled();
+  await page.getByLabel("Timeline length").fill("2");
+  await page.getByRole("button", { name: "Save timeline" }).click();
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Outside timeline");
+  await page.locator(".roadmap-step-toggle").click();
+  await page.getByRole("button", { name: "Edit step or notes" }).click();
+  await page.getByLabel("Notes").fill("First line\nSecond line");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await page.getByRole("button", { name: "Edit timeline →" }).click();
+  await page.getByLabel("Timeline length").fill("5");
+  await page.getByLabel("Timeline unit").selectOption("months");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Continue to final roadmap →" }).click();
+  await expect(page.locator(".duration-info")).toContainText("2 years");
+  await page.locator(".roadmap-final-step summary").click();
+  await expect(page.locator(".step-notes")).toHaveText("Notes: First line\nSecond line");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("insight-guest-plan") ?? "{}").duration.amount)).toBe(2);
+  await page.reload();
+  await page.getByRole("button", { name: "Your plan" }).click();
+  await openEditor(page);
+  await expect(page.locator(".roadmap-duration")).toHaveText("2 years");
+  await page.locator(".roadmap-step-toggle").click();
+  await expect(page.locator(".roadmap-notes")).toHaveText("First line\nSecond line");
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Outside timeline");
+  await page.getByRole("button", { name: "Edit timeline →" }).click();
+  await page.getByLabel("Timeline unit").selectOption("months");
+  await page.getByRole("button", { name: "Save timeline" }).click();
+  await expect(page.locator(".roadmap-duration")).toHaveText("2 months");
+  await expect(page.locator(".roadmap-step-toggle")).toContainText("Outside timeline");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("insight-guest-plan") ?? "{}").duration.unit)).toBe("months");
+});
+
 test.describe("touch roadmap controls", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 

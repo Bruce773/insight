@@ -20,6 +20,7 @@ export function RoadmapPlanner({
   ideaFocus,
   onFocus,
   onChange,
+  onChangeDuration,
   onSetDuration,
   onBack,
 }: {
@@ -32,11 +33,13 @@ export function RoadmapPlanner({
   ideaFocus?: string;
   onFocus: (skill: string) => void;
   onChange: (roadmap: Roadmap) => void;
+  onChangeDuration: (duration: Duration) => void;
   onSetDuration: () => void;
   onBack: () => void;
 }) {
   const [mode, setMode] = useState<RoadmapPlannerMode | "final" | null>(null);
   const [visitedGeneration, setVisitedGeneration] = useState(false);
+  const [editTimeline, setEditTimeline] = useState(false);
 
   function selectMode(next: RoadmapPlannerMode) {
     if (next === "generate") setVisitedGeneration(true);
@@ -78,15 +81,18 @@ export function RoadmapPlanner({
         focus={ideaFocus}
         onFocus={onFocus}
         onChange={onChange}
+        onChangeDuration={onChangeDuration}
+        editTimeline={editTimeline}
         onSetDuration={onSetDuration}
         onBack={() => setMode(null)}
         onGenerate={() => selectMode("generate")}
-        onViewFinal={() => setMode("final")}
+        onViewFinal={() => { setEditTimeline(false); setMode("final"); }}
       />}
       {mode === "final" && <RoadmapPlannerStep4
         roadmap={roadmap}
         duration={duration}
-        onBack={() => setMode("manual")}
+        onBack={() => { setEditTimeline(false); setMode("manual"); }}
+        onEditTimeline={() => { setEditTimeline(true); setMode("manual"); }}
       />}
     </>
   );

@@ -1,13 +1,15 @@
-import { ChevronIcon } from "@/components/icon";
+import { ChevronIcon, EditIcon } from "@/components/icon";
 import type { Duration, Roadmap } from "@/lib/engine/roadmap";
 import "./roadmap-planner-step4.css";
 
-export function RoadmapPreview({ roadmap, duration }: { roadmap: Roadmap; duration?: Duration }) {
+export function RoadmapPreview({ roadmap, duration, onEditTimeline }: { roadmap: Roadmap; duration?: Duration; onEditTimeline?: () => void }) {
   return (
     <div className="roadmap-final-view">
       <div className="roadmap-final-header">
         <h2>Your Step-by-Step Plan</h2>
-        {duration && <div className="duration-info"><strong>Timeline:</strong> {duration.amount} {duration.unit}</div>}
+        {duration && <div className="duration-info"><strong>Timeline:</strong> {duration.amount} {duration.unit}
+          {onEditTimeline && <button type="button" className="duration-edit" aria-label="Edit timeline" title="Edit timeline" onClick={onEditTimeline}><EditIcon /></button>}
+        </div>}
       </div>
       {roadmap.steps.length === 0 ? <p>No steps in this roadmap yet.</p> : <>
         <p className="hint">Select a step to see its details.</p>

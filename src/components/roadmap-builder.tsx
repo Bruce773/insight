@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { RoadmapStepCard } from "@/components/roadmap-step-card";
-import type { Duration, Roadmap, RoadmapSkill, RoadmapStep } from "@/lib/engine/roadmap";
+import { isDuration, type Duration, type DurationUnit, type Roadmap, type RoadmapSkill, type RoadmapStep } from "@/lib/engine/roadmap";
 
-export function RoadmapBuilder({ duration, roadmap, onChange, onSetDuration }: {
+export function RoadmapBuilder({ duration, roadmap, onChange, onChangeDuration, editTimeline, onSetDuration }: {
   duration?: Duration;
   roadmap: Roadmap;
   onChange: (roadmap: Roadmap) => void;
+  onChangeDuration: (duration: Duration) => void;
+  editTimeline: boolean;
   onSetDuration: () => void;
 }) {
   const [skillName, setSkillName] = useState("");
@@ -16,6 +18,9 @@ export function RoadmapBuilder({ duration, roadmap, onChange, onSetDuration }: {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
   const [moveMessage, setMoveMessage] = useState("");
+  const [editingDuration, setEditingDuration] = useState(editTimeline);
+  const [durationAmount, setDurationAmount] = useState(String(duration?.amount ?? ""));
+  const [durationUnit, setDurationUnit] = useState<DurationUnit>(duration?.unit ?? "months");
   const drag = useRef<{ pointerId: number; id: string; x: number; y: number; currentX: number; currentY: number; moved: boolean; target: { id: string; position: "before" | "after" } | null } | null>(null);
   const scrollFrame = useRef<number | null>(null);
 
@@ -109,7 +114,31 @@ export function RoadmapBuilder({ duration, roadmap, onChange, onSetDuration }: {
       {duration && <span className="roadmap-duration">{duration.amount} {duration.unit}</span>}
     </div>
     <p className="roadmap-intro">A plan to revisit, not a prediction. Add the steps that feel right for you.</p>
-    {!duration && <div className="roadmap-duration-notice"><span>Set an exact duration to generate a timed roadmap.</span><button type="button" className="text-button" onClick={onSetDuration}>Set your timeline →</button></div>}
+    {editingDuration ? <form className="roadmap-duration-editor" onSubmit={(event) => {
+      event.preventDefault();
+      const next = { amount: Number(durationAmount), unit: durationUnit };
+      if (!isDuration(next)) return;
+      onChangeDuration(next);
+      setEditingDuration(false);
+    }}>
+      <label htmlFor="roadmap-duration-amount">Timeline length</label>
+      <div className="roadmap-input-row">
+        <input id="roadmap-duration-amount" className="roadmap-time" type="number" min="1" max="1000" required autoFocus value={durationAmount} onChange={(event) => setDurationAmount(event.target.value)} />
+        <label className="sr-only" htmlFor="roadmap-duration-unit">Timeline unit</label>
+        <select id="roadmap-duration-unit" value={durationUnit} onChange={(event) => setDurationUnit(event.target.value as DurationUnit)}>
+          <option value="weeks">Weeks</option><option value="months">Months</option><option value="years">Years</option>
+        </select>
+      </div>
+      <p className="hint">Choose a whole number from 1 to 1,000. Changing the timeline flags your roadmap for review; step timings are not converted.</p>
+      <div className="actions"><button type="submit" className="primary" disabled={!isDuration({ amount: Number(durationAmount), unit: durationUnit })}>Save timeline</button><button type="button" className="text-button" onClick={() => setEditingDuration(false)}>Cancel</button></div>
+    </form> : <div className="roadmap-duration-notice">
+      <span>{duration ? "Adjust your timeline as your plans change." : "Set an exact duration to generate a timed roadmap."}</span>
+      {duration ? <button type="button" className="text-button" onClick={() => {
+        setDurationAmount(String(duration?.amount ?? ""));
+        setDurationUnit(duration?.unit ?? "months");
+        setEditingDuration(true);
+      }}>Edit timeline →</button> : <button type="button" className="text-button" onClick={onSetDuration}>Set your timeline →</button>}
+    </div>}
 
     {roadmap.steps.length > 0 && <p className="hint">{duration ? `Place steps within your ${duration.amount}-${duration.unit} timeline.` : "Add steps now and choose their timing after setting a duration."} Drag a handle to reorder, or open a step to use the move buttons.</p>}
     <p className="sr-only" aria-live="polite">{moveMessage}</p>

@@ -9,10 +9,12 @@ export function RoadmapPlannerStep4({
   roadmap,
   duration,
   onBack,
+  onEditTimeline,
 }: {
   roadmap: Roadmap;
   duration?: Duration;
   onBack: () => void;
+  onEditTimeline: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [shareLink, setShareLink] = useState("");
@@ -64,7 +66,7 @@ export function RoadmapPlannerStep4({
       return;
     }
     printable.querySelectorAll("details").forEach((details) => { details.open = true; });
-    printable.querySelectorAll(".final-step-chevron, .hint").forEach((element) => element.remove());
+    printable.querySelectorAll(".final-step-chevron, .hint, .duration-edit").forEach((element) => element.remove());
 
     const printWindow = window.open("", "", "height=400,width=800");
     if (!printWindow) {
@@ -72,7 +74,7 @@ export function RoadmapPlannerStep4({
       return;
     }
 
-    printWindow.document.write("<html><head><title>My Roadmap</title><style>.final-step-header { display: flex; gap: 0.75em; } .roadmap-final-step { break-inside: avoid; }</style></head><body>");
+    printWindow.document.write("<html><head><title>My Roadmap</title><style>.final-step-header { display: flex; gap: 0.75em; } .roadmap-final-step { break-inside: avoid; } .step-notes { white-space: pre-wrap; overflow-wrap: anywhere; }</style></head><body>");
     printWindow.document.write(printable.innerHTML);
     printWindow.document.write("</body></html>");
     printWindow.document.close();
@@ -106,7 +108,8 @@ export function RoadmapPlannerStep4({
           Here&apos;s your personalized plan. You can export it, share it, or come back to edit it anytime.
         </p>
 
-        <RoadmapPreview roadmap={roadmap} duration={duration} />
+        <button type="button" className="primary roadmap-edit-button" onClick={onBack}>Edit roadmap <span aria-hidden>→</span></button>
+        <RoadmapPreview roadmap={roadmap} duration={duration} onEditTimeline={onEditTimeline} />
 
         <div className="roadmap-export-section">
           <h2>Share & export your roadmap</h2>
@@ -159,11 +162,6 @@ export function RoadmapPlannerStep4({
           </div>
         </div>
 
-        <div className="actions">
-          <button type="button" className="text-button" onClick={onBack}>
-            Edit roadmap
-          </button>
-        </div>
       </div>
     </div>
   );

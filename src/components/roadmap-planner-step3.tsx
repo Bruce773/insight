@@ -15,6 +15,8 @@ export function RoadmapPlannerStep3({
   focus,
   onFocus,
   onChange,
+  onChangeDuration,
+  editTimeline,
   onSetDuration,
   onBack,
   onGenerate,
@@ -28,6 +30,8 @@ export function RoadmapPlannerStep3({
   focus?: string;
   onFocus: (skill: string) => void;
   onChange: (roadmap: Roadmap) => void;
+  onChangeDuration: (duration: Duration) => void;
+  editTimeline: boolean;
   onSetDuration: () => void;
   onBack: () => void;
   onGenerate: () => void;
@@ -48,6 +52,8 @@ export function RoadmapPlannerStep3({
               duration={duration}
               roadmap={roadmap}
               onChange={onChange}
+              onChangeDuration={onChangeDuration}
+              editTimeline={editTimeline}
               onSetDuration={onSetDuration}
             />
           </div>

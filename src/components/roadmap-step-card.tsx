@@ -77,6 +77,7 @@ export function RoadmapStepCard({ step, index, count, duration, dragging, dropPo
         <p><strong>When:</strong> {duration ? `${duration.unit} ${step.at}` : `Timeline unit ${step.at} (set a duration to choose units)`}</p>
         <p><strong>Notes:</strong> <span className="roadmap-notes">{step.notes?.trim() ? step.notes : "No notes yet."}</span></p>
         <div className="roadmap-controls">
+          <button type="button" className="text-button" onClick={startEditing}>Edit step or notes</button>
           <button type="button" className="text-button" disabled={index === 0} onClick={() => onMove(-1)} aria-label={`Move step ${index + 1} up`}>↑ Move up</button>
           <button type="button" className="text-button" disabled={index === count - 1} onClick={() => onMove(1)} aria-label={`Move step ${index + 1} down`}>↓ Move down</button>
           {step.review && <button type="button" className="text-button" onClick={() => onUpdate({ review: false })}>Reviewed</button>}

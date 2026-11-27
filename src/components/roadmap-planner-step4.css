@@ -58,6 +58,37 @@
   white-space: nowrap;
 }
 
+.duration-edit {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -8px -10px -8px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  opacity: 0;
+}
+
+.duration-edit svg {
+  width: 18px;
+  height: 18px;
+}
+
+.duration-info:hover .duration-edit,
+.duration-edit:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .duration-edit { opacity: 1; }
+}
+
+.roadmap-edit-button {
+  align-self: flex-start;
+}
+
 .roadmap-final-steps {
   list-style: none;
   padding: 0;
@@ -125,6 +156,10 @@
   color: #666;
   margin: 8px 0 0 60px;
   overflow-wrap: anywhere;
+}
+
+.step-notes {
+  white-space: pre-wrap;
 }
 
 .step-timeline strong,
@@ -254,6 +289,18 @@
 .download-buttons .secondary {
   flex: 1;
   min-width: 150px;
+  border: 1px solid #aebfae;
+  border-radius: 10px;
+  padding: 12px 20px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.download-buttons .secondary:hover {
+  border-color: #67965d;
+  background: rgba(237, 245, 230, .6);
 }
 
 .roadmap-planner-step4 .actions {
@@ -279,6 +326,11 @@
   .roadmap-planner-step4 > .eyebrow,
   .roadmap-planner-step4 > h1,
   .roadmap-planner-step4 > .lead {
+    display: none;
+  }
+
+  .roadmap-edit-button,
+  .duration-edit {
     display: none;
   }
 

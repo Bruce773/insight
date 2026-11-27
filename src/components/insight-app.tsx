@@ -441,6 +441,12 @@ export function InsightApp() {
             ideaFocus={plan.ideaFocus}
             onFocus={(ideaFocus) => setPlan((current) => ({ ...current, ideaFocus }))}
             onChange={(roadmap) => setPlan((current) => ({ ...current, roadmap }))}
+            onChangeDuration={(duration) => {
+              setDurationUnit(duration.unit);
+              setPlan((current) => current.duration?.amount === duration.amount && current.duration.unit === duration.unit
+                ? current
+                : { ...current, duration, roadmap: markRoadmapForReview(current.roadmap) });
+            }}
             onSetDuration={() => { setTimelineOpen(true); setStep("aspirations"); }}
             onBack={() => setStep("skills")}
           />
